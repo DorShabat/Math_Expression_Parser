@@ -1,9 +1,11 @@
 # save 02/08/2024 10:30
 # evaluation working
 import numpy as np
+from lr_parsing_table import get_parsing_table3
 
 import graphviz
 import sympy as sp
+
 def tree_to_dot(node, dot=None):
     if dot is None:
         dot = graphviz.Digraph()
@@ -66,15 +68,6 @@ class Node:
             return Node('*', Node('^', base, exponent),
                         Node('+', Node('*', exponent, Node('/', base_diff, base)),
                              Node('*', Node('ln', None,base), exponent_diff)))
-
-        #elif self.value == '^':
-        #    if isinstance(self.right.value, int) or isinstance(self.right.value, float): # a in the exp
-        #        new_exp = Node('-', self.right, Node(1))
-        #        return Node('*', Node('*', self.right, Node('^', self.left, new_exp)),self.left.differentiate())
-        #    else:
-        #        return Node('*', Node('^', self.left, self.right), Node('+', Node('*', self.right.differentiate(), Node('ln', self.left)),
-        #                         Node('*', Node('/', self.right, self.left), self.left.differentiate())))
-
         elif self.value == 'sin':
             return Node('*', Node('cos',None, self.right), self.right.differentiate())
         elif self.value == 'cos':
@@ -97,10 +90,9 @@ class Node:
         # f(g(x)) - not implemented yet !!!!!!
 
 class LRParser:
-    def __init__(self, parsing_table, X, flag):
+    def __init__(self, parsing_table, X):
         self.parsing_table = parsing_table
         self.X = X
-        self.derivative_or_eval = flag
 
     def parse(self, tokens):
         stack = [0]
@@ -122,9 +114,9 @@ class LRParser:
                     next_state = int(action[1:])
                     stack.append(next_state)
                     if token[0] == 'VAR':
-                        value_stack.append(self.X)
+                        value_stack.append(Node('X'))
                     else:
-                        value_stack.append(token[1])
+                        value_stack.append(Node(token[1]))
                     index += 1
                     token = tokens[index]
                 elif action.startswith('r'):
@@ -141,12 +133,7 @@ class LRParser:
                         values.append(value_stack.pop())
 
                     values.reverse()
-                    if self.derivative_or_eval == 1:
-                        result = self.build_tree(lhs, values)
-                    else:
-                        result = self.evaluate(lhs, values)
-                    
-
+                    result = self.build_tree(lhs, values)
 
                     state = stack[-1]
                     stack.append(self.parsing_table[str(state)][lhs])
@@ -158,54 +145,6 @@ class LRParser:
                     raise RuntimeError(f'Unknown action: {action}')
             else:
                 raise RuntimeError(f'Unexpected token: {token}')
-
-    def evaluate(self, lhs, values):
-        if lhs == 'E':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '+':
-                return values[0] + values[2]
-            elif values[1] == '-':
-                return values[0] - values[2]
-        elif lhs == 'T':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '*':
-                return values[0] * values[2]
-            elif values[1] == '/':
-                return values[0] / values[2]
-        elif lhs == 'F':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '^':
-                return values[0] ** values[2]
-        elif lhs == 'G':
-            if len(values) == 1:
-                return values[0]
-            elif len(values) == 2:
-                return -values[1]
-            elif values[0] == '(':
-                return values[1]
-            elif len(values) == 4:
-                func = values[0]
-                arg = values[2]
-                if func == 'sin':
-                    return np.sin(arg)
-                elif func == 'cos':
-                    return np.cos(arg)
-                elif func == 'tg':
-                    return np.tan(arg)
-                elif func == 'arcsin':
-                    return np.arcsin(arg)
-                elif func == 'arccos':
-                    return np.arccos(arg)
-                elif func == 'arctg':
-                    return np.arctan(arg)
-                elif func == 'exp':
-                    return np.exp(arg)
-                elif func == 'ln':
-                    return np.log(arg)
-        return values[0]
     
     def build_tree(self, lhs, values):
         if lhs == 'E':
@@ -245,20 +184,10 @@ class LRParser:
                 arg = values[2]
                 return Node(func,None, arg)
         return values[0]
-    
-    
-    def differentiate_expression(self, expression,i):
-        tokens = tokenize(expression)
-        op_tree = self.parse(tokens) ######################################################
-        #create_tree_png(parsed_expr, f"derivative/{i}_parsed_expr")
 
-        differentiated_expr = op_tree.differentiate()
-        
-        #tokens2 = tokenize(tree_to_string(differentiated_expr))
-        #parsed_expr2 = self.parse(tokens2)
-        #print(parsed_expr2)
 
-        return differentiated_expr
+
+
 
 def tree_to_string(node):
     if node.left is None and node.right is None:
@@ -309,147 +238,122 @@ def tokenize(expression):
     tokens.append(('$', '$'))
     return tokens
 
+def evaluate(node, X):
+    if node.value == 'X':
+        return X
+    elif isinstance(node.value, (int, float)):
+        return node.value
 
-def get_parsing_table3():
-    parsing_table = {
-        '0': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 1, 'T': 2, 'F': 3, 'G': 4,
-              'Func': 7}, '1': {'+': 's18', '-': 's19', '$': 'acc'},
-        '2': {')': 'r( E -> T )', '*': 's20', '+': 'r( E -> T )', '-': 'r( E -> T )', '/': 's21', '$': 'r( E -> T )'},
-        '3': {')': 'r( T -> F )', '*': 'r( T -> F )', '+': 'r( T -> F )', '-': 'r( T -> F )', '/': 'r( T -> F )',
-              '$': 'r( T -> F )'},
-        '4': {')': 'r( F -> G )', '*': 'r( F -> G )', '+': 'r( F -> G )', '-': 'r( F -> G )', '/': 'r( F -> G )',
-              '^': 's22', '$': 'r( F -> G )'},
-        '5': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 23, 'T': 2, 'F': 3, 'G': 4,
-              'Func': 7},
-        '6': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'G': 24, 'Func': 7},
-        '7': {'(': 's25'},
-        '8': {')': 'r( G -> NUMBER )', '*': 'r( G -> NUMBER )', '+': 'r( G -> NUMBER )', '-': 'r( G -> NUMBER )',
-              '/': 'r( G -> NUMBER )', '^': 'r( G -> NUMBER )', '$': 'r( G -> NUMBER )'},
-        '9': {')': 'r( G -> X )', '*': 'r( G -> X )', '+': 'r( G -> X )', '-': 'r( G -> X )', '/': 'r( G -> X )',
-              '^': 'r( G -> X )', '$': 'r( G -> X )'}, '10': {'(': 'r( Func -> sin )'}, '11': {'(': 'r( Func -> cos )'},
-        '12': {'(': 'r( Func -> tg )'}, '13': {'(': 'r( Func -> arcsin )'}, '14': {'(': 'r( Func -> arccos )'},
-        '15': {'(': 'r( Func -> arctg )'}, '16': {'(': 'r( Func -> exp )'}, '17': {'(': 'r( Func -> ln )'},
-        '18': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'T': 26, 'F': 3, 'G': 4, 'Func': 7},
-        '19': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'T': 27, 'F': 3, 'G': 4, 'Func': 7},
-        '20': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 28, 'G': 4, 'Func': 7},
-        '21': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 29, 'G': 4, 'Func': 7},
-        '22': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 30, 'G': 4, 'Func': 7},
-        '23': {')': 's31', '+': 's18', '-': 's19'},
-        '24': {')': 'r( G -> - G )', '*': 'r( G -> - G )', '+': 'r( G -> - G )', '-': 'r( G -> - G )',
-               '/': 'r( G -> - G )', '^': 'r( G -> - G )', '$': 'r( G -> - G )'},
-        '25': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
-               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 32, 'T': 2, 'F': 3, 'G': 4,
-               'Func': 7},
-        '26': {')': 'r( E -> E + T )', '*': 's20', '+': 'r( E -> E + T )', '-': 'r( E -> E + T )', '/': 's21',
-               '$': 'r( E -> E + T )'},
-        '27': {')': 'r( E -> E - T )', '*': 's20', '+': 'r( E -> E - T )', '-': 'r( E -> E - T )', '/': 's21',
-               '$': 'r( E -> E - T )'},
-        '28': {')': 'r( T -> T * F )', '*': 'r( T -> T * F )', '+': 'r( T -> T * F )', '-': 'r( T -> T * F )',
-               '/': 'r( T -> T * F )', '$': 'r( T -> T * F )'},
-        '29': {')': 'r( T -> T / F )', '*': 'r( T -> T / F )', '+': 'r( T -> T / F )', '-': 'r( T -> T / F )',
-               '/': 'r( T -> T / F )', '$': 'r( T -> T / F )'},
-        '30': {')': 'r( F -> G ^ F )', '*': 'r( F -> G ^ F )', '+': 'r( F -> G ^ F )', '-': 'r( F -> G ^ F )',
-               '/': 'r( F -> G ^ F )', '$': 'r( F -> G ^ F )'},
-        '31': {')': 'r( G -> ( E ) )', '*': 'r( G -> ( E ) )', '+': 'r( G -> ( E ) )', '-': 'r( G -> ( E ) )',
-               '/': 'r( G -> ( E ) )', '^': 'r( G -> ( E ) )', '$': 'r( G -> ( E ) )'},
-        '32': {')': 's33', '+': 's18', '-': 's19'},
-        '33': {')': 'r( G -> Func ( E ) )', '*': 'r( G -> Func ( E ) )', '+': 'r( G -> Func ( E ) )',
-               '-': 'r( G -> Func ( E ) )', '/': 'r( G -> Func ( E ) )', '^': 'r( G -> Func ( E ) )',
-               '$': 'r( G -> Func ( E ) )'}}
-    return parsing_table
+    left_val = evaluate(node.left, X) if node.left else None
+    right_val = evaluate(node.right, X) if node.right else None
+
+    if node.value == '+':
+        return left_val + right_val
+    elif node.value == '-':
+        return left_val - right_val if left_val is not None else -right_val
+    elif node.value == '*':
+        return left_val * right_val
+    elif node.value == '/':
+        return left_val / right_val
+    elif node.value == '^':
+        return left_val ** right_val
+    elif node.value == 'sin':
+        return np.sin(right_val)
+    elif node.value == 'cos':
+        return np.cos(right_val)
+    elif node.value == 'tg':
+        return np.tan(right_val)
+    elif node.value == 'arcsin':
+        return np.arcsin(right_val)
+    elif node.value == 'arccos':
+        return np.arccos(right_val)
+    elif node.value == 'arctg':
+        return np.arctan(right_val)
+    elif node.value == 'exp':
+        return np.exp(right_val)
+    elif node.value == 'ln':
+        return np.log(right_val)
+    else:
+        raise ValueError(f"Unsupported operation: {node.value}")
+
+# Adding this function into your provided script
+
 
 
 def main():
     parsing_table = get_parsing_table3()
-    expressions = [
-        ("X+6", 8),
-        ("sin(0)", 0),
-        ("3 + 4", 7),  # Expected: 7
-        ("(3 + 4)", 7),  # Expected: 7
-        ("(2 * (3 + 4))", 14),  # Expected: 14
-        ("(5 - 3)", 2),  # Expected: 2
-        ("((2 + 3) * (4 - 1))", 15),  # Expected: 15
-    ]
-    X = 2
-    parser = LRParser(parsing_table, X,1)
-    for expression, expected in expressions:
 
-        tokens = tokenize(expression)
-        try:
-            result = parser.parse(tokens)
-            print(f"The result of the expression '{expression}' is {result}. Expected: {expected}")
-        except RuntimeError as e:
-            print(f"Error parsing expression '{expression}': {e}")
-
-def test_differentiation():
-    parsing_table = get_parsing_table3()
-    X = 2
-    parser = LRParser(parsing_table, X,1)
     expressions = [
-        #"-6",
-        #"sin(X)",
-        #"X^3",
-        #"cos(X)",
-        #"tg(X)",
-        #"arcsin(X)",
-        #"arccos(X)",
-        #"arctg(X)",
-        #"exp(X)",
-        #"ln(X)",
+        "X+6",
+        "sin(X)",
+        "3 + 4",
+        "(3 + 4)",
+        "(2 * (3 + 4))",
+        "(5 - 3)",
+        "((2 + 3) * (4 - 1))",
+        "-6",
+        "sin(X)",
+        "X^3",
+        "cos(X)",
+        "tg(X)",
+        "arcsin(X)",
+        "arccos(X)",
+        "arctg(X)",
+        "exp(X)",
+        "ln(X)",
         "sin(2*X)",
         "cos(2*X)",
         "sin(2*cos(2*X)^(2*X))",
         "-6",
         "X",
+        "-X",
         "8",
         "X + 8",
         "3*X",
         "X^2",
-
         "X^2 + 3*X + 1",
         "X^3",
         "X^2 * X + 3",
         "(X + 1)^2",
         "(2*X + 1)^2",
-
-        "X^2 / X^2"
+        "X^2 / X^2",
     ]
-    i = 0
+
+    #expressions = ["2*X*2+6","X^2+X*2+6","sin(X)"]
+    x = sp.symbols('X')
+
+    X = 2
+    parser = LRParser(parsing_table, X)
     for expression in expressions:
 
-        derivative = parser.differentiate_expression(expression,i)
-        derivative_str = tree_to_string(derivative)
-        #create_tree_png(derivative, f"derivative/{i}_derivative")
-        i += 1
-        np.gradient("cos(x)")
-        print(f"Expression: {expression}")
-        print(f"Derivative: {derivative_str}")
+        tokens = tokenize(expression)
+        try:
+            op_tree = parser.parse(tokens)
+            # create_tree_png(op_tree, f"tree/{i}_op_tree")
 
+            op_tree_str = tree_to_string(op_tree)
+            print(f"op_tree_str: {op_tree_str}")
+            op_tree_eval = evaluate(op_tree,X)
+            print(f"op_tree_eval: {op_tree_eval}")
 
-        x = sp.symbols('X')
+            differentiated_tree = op_tree.differentiate()
+            # differentiated_tree_simplify_str = simplify(differentiated_tree)
 
-        derivative_us = sp.sympify(derivative_str.replace("^", "**").replace("tg","tan").replace("arc","a"))
-        print(f"derivative_us: {derivative_us}")
+            # create_tree_png(differentiated_tree, f"tree/{i}_parsed_expr")
+            differentiated_tree_str = tree_to_string(differentiated_tree)
+            print(f"differentiated_tree_str: {differentiated_tree_str}")
 
-        expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc","a"))
-        derivative_sp = sp.diff(expression_sp, x)
-        print(f"derivative_sp: {derivative_sp}")
+            derivative_us = sp.sympify(differentiated_tree_str.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
+            print(f"derivative_us: {derivative_us}")
+            expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
+            derivative_sp = sp.diff(expression_sp, x)
+            print(f"derivative_sp: {derivative_sp}")
 
-
-        print(f"Are they equivalent? {derivative_us.subs(x,2).evalf(4) == derivative_sp.subs(x,2).evalf(4)}")
-        #equivalence = sp.Eq(sp.sympify(derivative_us), sp.sympify(derivative_sp))
-        #print(f"Are they equivalent? {equivalence}")
-
-        print()
+            print(f"Are they equivalent? {derivative_us.subs(x, 2).evalf(4) == derivative_sp.subs(x, 2).evalf(4)}")
+            print()
+        except RuntimeError as e:
+            print(f"Error parsing expression '{expression}': {e}")
 
 
 if __name__ == "__main__":
-    test_differentiation()
+    main()

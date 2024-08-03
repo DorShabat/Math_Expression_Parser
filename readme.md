@@ -4,10 +4,10 @@
 3. LRParser.py - working example of evaluation.
 4. lr_table_Create.py - code to create lr table from excel table.
 5. lr_table.xlsx - the lr table - last table we are working with it table3. 
-6. LRParser_eval_and_derivative.py - initial start of combining evaluation and derivative.
+6. LRParser_eval_and_derivative.py - combining evaluation and derivative. - working! - creating tree then using tree to evaluate and derivative.
 7. LRParser_evaluateMathematicalExpression.py - try of derivative in other method (not in tree - not working).
 8. main.py - temp file for testing.
-
+9. lr_parsing_table.py - hard coded lr table.
 # Grammar
 in grammer.txt
 
@@ -42,6 +42,11 @@ Func -> sin
 
 # Link for lr parser creation
 https://cyberzhg.github.io/toolbox/
+
+# all the operation for promts
+```
++ , - , * , / , ^ , sin , cos , tg , arcsin , arccos , arctg , exp , ln
+```
 
 # Useful promts
 ```
