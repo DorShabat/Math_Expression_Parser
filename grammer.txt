@@ -1,0 +1,25 @@
+E  -> E + T
+    | E - T
+    | T
+
+T  -> T * F
+    | T / F
+    | F
+
+F  -> G ^ F
+    | G
+
+G  -> ( E )
+    | - G
+    | Func ( E )
+    | NUMBER
+	| X
+
+Func -> sin
+     | cos
+     | tg
+     | arcsin
+     | arccos
+     | arctg
+     | exp
+     | ln
