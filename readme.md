@@ -4,10 +4,10 @@
 3. LRParser.py - working example of evaluation.
 4. lr_table_Create.py - code to create lr table from excel table.
 5. lr_table.xlsx - the lr table - last table we are working with it table3. 
-6. LRParser_eval_and_derivative.py - combining evaluation and derivative. - working! - creating tree then using tree to evaluate and derivative.
-7. LRParser_evaluateMathematicalExpression.py - try of derivative in other method (not in tree - not working).
-8. main.py - temp file for testing.
-9. lr_parsing_table.py - hard coded lr table.
+6. LRParser_eval_and_derivative.py - combining evaluation and derivative. - working! - evauation using lr parser table and derivative using operation tree.
+7. main.py - temp file for testing.
+8. lr_parsing_table.py - hard coded lr table.
+9. tree_vizualize_functions.py - vizualize tree functions.
 # Grammar
 in grammer.txt
 

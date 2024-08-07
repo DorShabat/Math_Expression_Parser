@@ -3,36 +3,20 @@
 import numpy as np
 from lr_parsing_table import get_parsing_table3
 
-import graphviz
 import sympy as sp
 
 EVAL = 'eval'
-DERIVATE = 'derivate'
-
-def tree_to_dot(node, dot=None):
-    if dot is None:
-        dot = graphviz.Digraph()
-
-    node_id = str(id(node))
-    label = str(node.value)
-    dot.node(node_id, label)
-
-    if node.left:
-        left_id = str(id(node.left))
-        dot.edge(node_id, left_id)
-        tree_to_dot(node.left, dot)
-
-    if node.right:
-        right_id = str(id(node.right))
-        dot.edge(node_id, right_id)
-        tree_to_dot(node.right, dot)
-
-    return dot
+DERIVATIVE = 'derivative'
 
 
-def create_tree_png(node, filename):
-    dot = tree_to_dot(node)
-    dot.render(filename, format='png', cleanup=True)
+def tree_to_string(node):
+    if node.left is None and node.right is None:
+        return str(node.value)
+    left_str = tree_to_string(node.left) if node.left else ""
+    right_str = tree_to_string(node.right) if node.right else ""
+    if node.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]:
+        return f"{left_str} {node.value} ({right_str})"
+    return f"({left_str} {node.value} {right_str})"
 
 class Node:
     def __init__(self, value, left=None, right=None):
@@ -55,7 +39,7 @@ class Node:
             return Node('+', self.left.differentiate(), self.right.differentiate())
         elif self.value == '-':
             if self.left is None:
-                return Node('-',None,self.right.differentiate())
+                return Node('-', None, self.right.differentiate())
             return Node('-', self.left.differentiate(), self.right.differentiate())
         elif self.value == '*':
             return Node('+', Node('*', self.left.differentiate(), self.right),
@@ -70,19 +54,25 @@ class Node:
             exponent_diff = exponent.differentiate()
             return Node('*', Node('^', base, exponent),
                         Node('+', Node('*', exponent, Node('/', base_diff, base)),
-                             Node('*', Node('ln', None,base), exponent_diff)))
+                             Node('*', Node('ln', None, base), exponent_diff)))
         elif self.value == 'sin':
-            return Node('*', Node('cos',None, self.right), self.right.differentiate())
+            return Node('*', Node('cos', None, self.right), self.right.differentiate())
         elif self.value == 'cos':
-            return Node('*', Node('*', Node(-1), Node('sin',None, self.right)), self.right.differentiate())
+            return Node('*', Node('*', Node(-1), Node('sin', None, self.right)), self.right.differentiate())
         elif self.value == 'tg':
-            return Node('*', Node('/', Node(1), Node('^', Node('cos',None, self.right), Node(2))), self.right.differentiate())
+            return Node('*', Node('/', Node(1), Node('^', Node('cos', None, self.right), Node(2))),
+                        self.right.differentiate())
         elif self.value == 'arcsin':
-            return Node('*',Node('/', Node(1), Node('^', Node('-', Node(1), Node('^', self.right, Node(2))), Node(0.5))),self.right.differentiate())
+            return Node('*',
+                        Node('/', Node(1), Node('^', Node('-', Node(1), Node('^', self.right, Node(2))), Node(0.5))),
+                        self.right.differentiate())
         elif self.value == 'arccos':
-            return Node('*', Node(-1), Node('*', Node('/', Node(1),Node('^', Node('-', Node(1), Node('^', self.right, Node(2))),Node(0.5))), self.right.differentiate()))
+            return Node('*', Node(-1), Node('*', Node('/', Node(1),
+                                                      Node('^', Node('-', Node(1), Node('^', self.right, Node(2))),
+                                                           Node(0.5))), self.right.differentiate()))
         elif self.value == 'arctg':
-            return Node('*', Node('/', Node(1), Node('+', Node(1), Node('^', self.right, Node(2)))), self.right.differentiate())
+            return Node('*', Node('/', Node(1), Node('+', Node(1), Node('^', self.right, Node(2)))),
+                        self.right.differentiate())
         elif self.value == 'exp':
             return Node('*', Node('exp', None, self.right), self.right.differentiate())
         elif self.value == 'ln':
@@ -96,7 +86,7 @@ class LRParser:
         self.parsing_table = parsing_table
         self.X = X
 
-    def parse(self, tokens,mode):
+    def parse(self, tokens, mode):
         stack = [0]
         index = 0
         token = tokens[index]
@@ -118,12 +108,12 @@ class LRParser:
                     if token[0] == 'VAR':
                         if mode == EVAL:
                             value_stack.append(self.X)
-                        elif mode == DERIVATE:
+                        elif mode == DERIVATIVE:
                             value_stack.append(Node('X'))
                     else:
                         if mode == EVAL:
                             value_stack.append(token[1])
-                        elif mode == DERIVATE:
+                        elif mode == DERIVATIVE:
                             value_stack.append(Node(token[1]))
                     index += 1
                     token = tokens[index]
@@ -143,7 +133,7 @@ class LRParser:
                     values.reverse()
                     if mode == EVAL:
                         result = self.evaluate(lhs, values)
-                    elif mode == DERIVATE:
+                    else:  # mode == DERIVATE
                         result = self.build_tree(lhs, values)
 
                     state = stack[-1]
@@ -151,12 +141,16 @@ class LRParser:
                     value_stack.append(result)
                 elif action == 'acc':
                     # Accept
-                    return value_stack[0]
+                    if mode == EVAL:
+                        return value_stack[0]
+                    else:  # mode == DERIVATE
+                        return tree_to_string(value_stack[0].differentiate())
+
                 else:
                     raise RuntimeError(f'Unknown action: {action}')
             else:
                 raise RuntimeError(f'Unexpected token: {token}')
-    
+
     def build_tree(self, lhs, values):
         if lhs == 'E':
             if len(values) == 1:
@@ -187,15 +181,15 @@ class LRParser:
             if len(values) == 1:
                 return values[0]
             elif len(values) == 2:
-                return Node('-',None,values[1])
+                return Node('-', None, values[1])
             elif values[0].value == '(':
-                return values[1] #####################
+                return values[1]
             elif len(values) == 4:
                 func = values[0].value
                 arg = values[2]
-                return Node(func,None, arg)
+                return Node(func, None, arg)
         return values[0]
-    
+
     def evaluate(self, lhs, values):
         if lhs == 'E':
             if len(values) == 1:
@@ -245,18 +239,6 @@ class LRParser:
         return values[0]
 
 
-
-
-
-def tree_to_string(node):
-    if node.left is None and node.right is None:
-        return str(node.value)
-    left_str = tree_to_string(node.left) if node.left else ""
-    right_str = tree_to_string(node.right) if node.right else ""
-    if node.value in ["cos","sin","ln","tg","arcsin","arccos","arctg","exp"]:
-        return f"{left_str} {node.value} ({right_str})"
-    return f"({left_str} {node.value} {right_str})"
-
 def tokenize(expression):
     tokens = []
     i = 0
@@ -296,49 +278,6 @@ def tokenize(expression):
 
     tokens.append(('$', '$'))
     return tokens
-'''
-def evaluate(node, X):
-    if node.value == 'X':
-        return X
-    elif isinstance(node.value, (int, float)):
-        return node.value
-
-    left_val = evaluate(node.left, X) if node.left else None
-    right_val = evaluate(node.right, X) if node.right else None
-
-    if node.value == '+':
-        return left_val + right_val
-    elif node.value == '-':
-        return left_val - right_val if left_val is not None else -right_val
-    elif node.value == '*':
-        return left_val * right_val
-    elif node.value == '/':
-        return left_val / right_val
-    elif node.value == '^':
-        return left_val ** right_val
-    elif node.value == 'sin':
-        return np.sin(right_val)
-    elif node.value == 'cos':
-        return np.cos(right_val)
-    elif node.value == 'tg':
-        return np.tan(right_val)
-    elif node.value == 'arcsin':
-        return np.arcsin(right_val)
-    elif node.value == 'arccos':
-        return np.arccos(right_val)
-    elif node.value == 'arctg':
-        return np.arctan(right_val)
-    elif node.value == 'exp':
-        return np.exp(right_val)
-    elif node.value == 'ln':
-        return np.log(right_val)
-    else:
-        raise ValueError(f"Unsupported operation: {node.value}")
-'''
-    
-
-# Adding this function into your provided script
-
 
 
 def main():
@@ -380,7 +319,7 @@ def main():
         "X^2 / X^2",
     ]
 
-    #expressions = ["2*X*2+6","X^2+X*2+6","sin(X)"]
+    # expressions = ["2*X*2+6","X^2+X*2+6","sin(X)"]
     x = sp.symbols('X')
 
     X = 2
@@ -390,24 +329,19 @@ def main():
             tokens = tokenize(expression)
             # Evaluate
             print(f"f(x) = {expression}")
-            evaluate_expression = parser.parse(tokens,EVAL)
-            print(f"Eval(f(x={X})) = {evaluate_expression}")
+            evaluate_expression = parser.parse(tokens, EVAL)
+            print(f"Eval(f({X})) = {evaluate_expression:.4f}".rstrip('0').rstrip('.'))
 
-            op_tree = parser.parse(tokens,DERIVATE)
-            # create_tree_png(op_tree, f"tree/{i}_op_tree")
+            differentiated = parser.parse(tokens, DERIVATIVE)
+            print(f"Diff(f(x)) = {differentiated}")
 
-            differentiated_tree = op_tree.differentiate()
-            # create_tree_png(differentiated_tree, f"tree/{i}_parsed_expr")
-
-            differentiated_tree_str = tree_to_string(differentiated_tree)
-            print(f"Diff(f(x)) = {differentiated_tree_str}")
-
-            tokens_for_differentiated = tokenize(differentiated_tree_str)
-            evaluate_differentiated = parser.parse(tokens_for_differentiated,EVAL)
-            print(f"Diff(f(x={X})) = {evaluate_differentiated:.4f}")
+            tokens_for_differentiated = tokenize(differentiated)
+            evaluate_differentiated = parser.parse(tokens_for_differentiated, EVAL)
+            print(f"Diff(f({X})) = {evaluate_differentiated:.4f}".rstrip('0').rstrip('.'))
 
             ###################################
-            derivative_us = sp.sympify(differentiated_tree_str.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
+            print("########################")
+            derivative_us = sp.sympify(differentiated.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
             print(f"derivative_us: {derivative_us}")
             expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
             derivative_sp = sp.diff(expression_sp, x)
