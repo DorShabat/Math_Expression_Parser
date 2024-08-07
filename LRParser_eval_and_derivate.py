@@ -87,7 +87,6 @@ class Node:
         else:
             raise ValueError(f"Unsupported operation: {self.value}")
 
-        # f(g(x)) - not implemented yet !!!!!!
 
 class LRParser:
     def __init__(self, parsing_table, X):
