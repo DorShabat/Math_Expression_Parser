@@ -283,7 +283,7 @@ def tokenize(expression):
 def main():
     parsing_table = get_parsing_table3()
 
-    expressions = [
+    expressions1 = [
         "X+6",
         "sin(X)",
         "3 + 4",
@@ -318,20 +318,31 @@ def main():
         "(2*X + 1)^2",
         "X^2 / X^2",
     ]
-
-    # expressions = ["2*X*2+6","X^2+X*2+6","sin(X)"]
+    '''
+    value at x = 1: -10968.1737085657 + 38116.0419579044*I
+    '''
+    expressions = [
+        "(-X + (-X/tan(X) + sin(X - 2)**cos(X + 3)/atan(X - 3) + tan(5)*tan(X) + atan(X - 3) + X**(-5))*tan(X))/(X**(-3))**(X**(-3)) + exp(X) + log(X - 2) + 2*sin(X)"]
     x = sp.symbols('X')
 
+    #expressions[0].replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atan", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
+    #X = -1.9286689276512163
     X = 2
     parser = LRParser(parsing_table, X)
     for expression in expressions:
         try:
+            print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
+
+            expression = expression.replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atg", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
+
+
             tokens = tokenize(expression)
             # Evaluate
             print(f"f(x) = {expression}")
             evaluate_expression = parser.parse(tokens, EVAL)
             print(f"Eval(f({X})) = {evaluate_expression:.4f}".rstrip('0').rstrip('.'))
 
+            """
             differentiated = parser.parse(tokens, DERIVATIVE)
             print(f"Diff(f(x)) = {differentiated}")
 
@@ -348,6 +359,7 @@ def main():
             print(f"derivative_sp: {derivative_sp}")
 
             print(f"Are they equivalent? {derivative_us.subs(x, 2).evalf(4) == derivative_sp.subs(x, 2).evalf(4)}")
+            """
             print()
         except RuntimeError as e:
             print(f"Error parsing expression '{expression}': {e}")
