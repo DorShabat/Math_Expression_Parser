@@ -6,6 +6,9 @@ from lr_parsing_table import get_parsing_table3
 import graphviz
 import sympy as sp
 
+EVAL = 'eval'
+DERIVATE = 'derivate'
+
 def tree_to_dot(node, dot=None):
     if dot is None:
         dot = graphviz.Digraph()
@@ -93,7 +96,7 @@ class LRParser:
         self.parsing_table = parsing_table
         self.X = X
 
-    def parse(self, tokens):
+    def parse(self, tokens,mode):
         stack = [0]
         index = 0
         token = tokens[index]
@@ -113,9 +116,15 @@ class LRParser:
                     next_state = int(action[1:])
                     stack.append(next_state)
                     if token[0] == 'VAR':
-                        value_stack.append(Node('X'))
+                        if mode == EVAL:
+                            value_stack.append(self.X)
+                        elif mode == DERIVATE:
+                            value_stack.append(Node('X'))
                     else:
-                        value_stack.append(Node(token[1]))
+                        if mode == EVAL:
+                            value_stack.append(token[1])
+                        elif mode == DERIVATE:
+                            value_stack.append(Node(token[1]))
                     index += 1
                     token = tokens[index]
                 elif action.startswith('r'):
@@ -132,7 +141,10 @@ class LRParser:
                         values.append(value_stack.pop())
 
                     values.reverse()
-                    result = self.build_tree(lhs, values)
+                    if mode == EVAL:
+                        result = self.evaluate(lhs, values)
+                    elif mode == DERIVATE:
+                        result = self.build_tree(lhs, values)
 
                     state = stack[-1]
                     stack.append(self.parsing_table[str(state)][lhs])
@@ -182,6 +194,54 @@ class LRParser:
                 func = values[0].value
                 arg = values[2]
                 return Node(func,None, arg)
+        return values[0]
+    
+    def evaluate(self, lhs, values):
+        if lhs == 'E':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '+':
+                return values[0] + values[2]
+            elif values[1] == '-':
+                return values[0] - values[2]
+        elif lhs == 'T':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '*':
+                return values[0] * values[2]
+            elif values[1] == '/':
+                return values[0] / values[2]
+        elif lhs == 'F':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '^':
+                return values[0] ** values[2]
+        elif lhs == 'G':
+            if len(values) == 1:
+                return values[0]
+            elif len(values) == 2:
+                return -values[1]
+            elif values[0] == '(':
+                return values[1]
+            elif len(values) == 4:
+                func = values[0]
+                arg = values[2]
+                if func == 'sin':
+                    return np.sin(arg)
+                elif func == 'cos':
+                    return np.cos(arg)
+                elif func == 'tg':
+                    return np.tan(arg)
+                elif func == 'arcsin':
+                    return np.arcsin(arg)
+                elif func == 'arccos':
+                    return np.arccos(arg)
+                elif func == 'arctg':
+                    return np.arctan(arg)
+                elif func == 'exp':
+                    return np.exp(arg)
+                elif func == 'ln':
+                    return np.log(arg)
         return values[0]
 
 
@@ -236,7 +296,7 @@ def tokenize(expression):
 
     tokens.append(('$', '$'))
     return tokens
-
+'''
 def evaluate(node, X):
     if node.value == 'X':
         return X
@@ -274,6 +334,8 @@ def evaluate(node, X):
         return np.log(right_val)
     else:
         raise ValueError(f"Unsupported operation: {node.value}")
+'''
+    
 
 # Adding this function into your provided script
 
@@ -324,24 +386,27 @@ def main():
     X = 2
     parser = LRParser(parsing_table, X)
     for expression in expressions:
-
-        tokens = tokenize(expression)
         try:
-            op_tree = parser.parse(tokens)
+            tokens = tokenize(expression)
+            # Evaluate
+            print(f"f(x) = {expression}")
+            evaluate_expression = parser.parse(tokens,EVAL)
+            print(f"Eval(f(x={X})) = {evaluate_expression}")
+
+            op_tree = parser.parse(tokens,DERIVATE)
             # create_tree_png(op_tree, f"tree/{i}_op_tree")
 
-            op_tree_str = tree_to_string(op_tree)
-            print(f"op_tree_str: {op_tree_str}")
-            op_tree_eval = evaluate(op_tree,X)
-            print(f"op_tree_eval: {op_tree_eval}")
-
             differentiated_tree = op_tree.differentiate()
-            # differentiated_tree_simplify_str = simplify(differentiated_tree)
-
             # create_tree_png(differentiated_tree, f"tree/{i}_parsed_expr")
-            differentiated_tree_str = tree_to_string(differentiated_tree)
-            print(f"differentiated_tree_str: {differentiated_tree_str}")
 
+            differentiated_tree_str = tree_to_string(differentiated_tree)
+            print(f"Diff(f(x)) = {differentiated_tree_str}")
+
+            tokens_for_differentiated = tokenize(differentiated_tree_str)
+            evaluate_differentiated = parser.parse(tokens_for_differentiated,EVAL)
+            print(f"Diff(f(x={X})) = {evaluate_differentiated:.4f}")
+
+            ###################################
             derivative_us = sp.sympify(differentiated_tree_str.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
             print(f"derivative_us: {derivative_us}")
             expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
