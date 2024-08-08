@@ -3,7 +3,6 @@
 import numpy as np
 from lr_parsing_table import get_parsing_table3
 
-import sympy as sp
 
 EVAL = 'eval'
 DERIVATIVE = 'derivative'
@@ -322,8 +321,19 @@ def main():
     value at x = 1: -10968.1737085657 + 38116.0419579044*I
     '''
     expressions = [
-        "(-X + (-X/tan(X) + sin(X - 2)**cos(X + 3)/atan(X - 3) + tan(5)*tan(X) + atan(X - 3) + X**(-5))*tan(X))/(X**(-3))**(X**(-3)) + exp(X) + log(X - 2) + 2*sin(X)"]
-    x = sp.symbols('X')
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)", #103.265
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9", #50.1501
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)+X^X", #53.7063
+        "X^X^X",
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X-2*X*17*sin(8*X-13)",
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)",
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
+        #"arcsin((76/(4^11+80*9))*X)+546-38*X/11*(X-4)+ln(8*X/11)-arccos((93/7654326543)*X)",
+        "cos(11*(X^2-3*X^3+X+81))/X-41+X^5-287*48/X+tg(59*X-198)",
+        "sin(80)",
+    ]
 
     #expressions[0].replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atan", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
     #X = -1.9286689276512163
@@ -331,10 +341,10 @@ def main():
     parser = LRParser(parsing_table, X)
     for expression in expressions:
         try:
-            print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
+            #print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
 
             expression = expression.replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atg", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
-
+            print(f"len of expression: {len(expression)}")
 
             tokens = tokenize(expression)
             # Evaluate
@@ -342,7 +352,7 @@ def main():
             evaluate_expression = parser.parse(tokens, EVAL)
             print(f"Eval(f({X})) = {evaluate_expression:.4f}".rstrip('0').rstrip('.'))
 
-            """
+
             differentiated = parser.parse(tokens, DERIVATIVE)
             print(f"Diff(f(x)) = {differentiated}")
 
@@ -351,6 +361,9 @@ def main():
             print(f"Diff(f({X})) = {evaluate_differentiated:.4f}".rstrip('0').rstrip('.'))
 
             ###################################
+            import sympy as sp
+            x = sp.symbols('X')
+
             print("########################")
             derivative_us = sp.sympify(differentiated.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
             print(f"derivative_us: {derivative_us}")
@@ -359,7 +372,7 @@ def main():
             print(f"derivative_sp: {derivative_sp}")
 
             print(f"Are they equivalent? {derivative_us.subs(x, 2).evalf(4) == derivative_sp.subs(x, 2).evalf(4)}")
-            """
+
             print()
         except RuntimeError as e:
             print(f"Error parsing expression '{expression}': {e}")
