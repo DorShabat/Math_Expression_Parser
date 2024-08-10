@@ -272,7 +272,10 @@ evaluate _ "G" [ValString "-", ValDouble v] = ValDouble (-v)
 evaluate _ "G" [ValString "(", v, ValString ")"] = v
 evaluate _ "G" [ValString func, ValString "(", ValDouble arg, ValString ")"] = ValDouble (applyFunction func arg)
 
+-- If none of the patterns match, return the first value
+evaluate _ _ (v:_) = v
 evaluate _ _ _ = error "Unknown evaluation"
+
 
 
 
