@@ -4,16 +4,194 @@ from lr_parsing_table import get_parsing_table
 EVAL = 'eval'
 DERIVATIVE = 'derivative'
 
+def tokenize(expression):
+    tokens = []
+    i = 0
+    while i < len(expression):
+        char = expression[i]
 
-def tree_to_string(node):
-    if node.left is None and node.right is None:
-        return str(node.value)
-    left_str = tree_to_string(node.left) if node.left else ""
-    right_str = tree_to_string(node.right) if node.right else ""
-    if node.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp" , "-"]:
-        return f"{left_str} {node.value} ({right_str})"
-    return f"({left_str} {node.value} {right_str})"
+        if char.isdigit() or (char == '.' and i + 1 < len(expression) and expression[i + 1].isdigit()):
+            # Recognize numbers (integer and floating-point)
+            num = char
+            i += 1
+            while i < len(expression) and (expression[i].isdigit() or expression[i] == '.'):
+                num += expression[i]
+                i += 1
+            tokens.append(('NUMBER', float(num) if '.' in num else int(num)))
 
+        elif char == "X":
+            tokens.append(('VAR', char))
+            i += 1
+
+        elif char.isalpha():
+            # Recognize functions
+            func = char
+            i += 1
+            while i < len(expression) and expression[i].isalpha():
+                func += expression[i]
+                i += 1
+            tokens.append(('FUNCTION', func))
+        elif char in '+-*/^()':
+            # Recognize operators and parentheses
+            tokens.append(('OP', char))
+            i += 1
+        elif char in ' \t':
+            # Skip whitespace
+            i += 1
+        else:
+            raise RuntimeError(f'Unexpected character: {char}')
+
+    tokens.append(('$', '$'))
+    return tokens
+
+class LRParser:
+    def __init__(self, parsing_table, X):
+        self.parsing_table = parsing_table
+        self.X = X
+
+    def parse(self, tokens, mode):
+        states_stack = [0]
+        index = 0
+        token = tokens[index]
+        value_stack = []
+
+        while True:
+            state = int(states_stack[-1])
+            tableColNames = token[1]
+            if token[0] == "NUMBER":
+                tableColNames = token[0]
+            if tableColNames in self.parsing_table[str(state)]:
+                action = self.parsing_table[str(state)][tableColNames]
+                if action.startswith('s'):
+                    # Shift
+                    next_state = int(action[1:])
+                    states_stack.append(next_state)
+                    if token[0] == 'VAR':
+                        if mode == EVAL:
+                            value_stack.append(self.X)
+                        elif mode == DERIVATIVE:
+                            value_stack.append(Node('X'))
+                    else:
+                        if mode == EVAL:
+                            value_stack.append(token[1])
+                        elif mode == DERIVATIVE:
+                            value_stack.append(Node(token[1]))
+                    index += 1
+                    token = tokens[index]
+                elif action.startswith('r'):
+                    # Reduce
+                    production = action[1:].strip()
+                    if production.startswith('(') and production.endswith(')'):
+                        production = production[1:-1].strip()
+                    lhs, rhs = production.split(' -> ')
+                    rhs_symbols = rhs.split()
+
+                    valuesToReduce = []
+                    for _ in rhs_symbols:
+                        states_stack.pop()
+                        valuesToReduce.append(value_stack.pop())
+
+                    valuesToReduce.reverse()
+                    if mode == EVAL:
+                        result = self.evaluate(lhs, valuesToReduce)
+                    else:  # mode == DERIVATE
+                        result = self.build_tree(lhs, valuesToReduce)
+
+                    state = states_stack[-1]
+                    states_stack.append(self.parsing_table[str(state)][lhs])
+                    value_stack.append(result)
+                elif action == 'acc':
+                    # Accept
+                    if mode == EVAL:
+                        return value_stack[0]
+                    else:  # mode == DERIVATE
+                        return value_stack[0].differentiate().tree_to_string()
+
+                else:
+                    raise RuntimeError(f'Unknown action: {action}')
+            else:
+                raise RuntimeError(f'Unexpected token: {token}')
+
+    def evaluate(self, lhs, values):
+        if lhs == 'E':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '+':
+                return values[0] + values[2]
+            elif values[1] == '-':
+                return values[0] - values[2]
+        elif lhs == 'T':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '*':
+                return values[0] * values[2]
+            elif values[1] == '/':
+                return values[0] / values[2]
+        elif lhs == 'F':
+            if len(values) == 1:
+                return values[0]
+            elif values[1] == '^':
+                return values[0] ** values[2]
+        elif lhs == 'G':
+            if len(values) == 1:
+                return values[0]
+            elif len(values) == 2:
+                return -values[1]
+            elif values[0] == '(':
+                return values[1]
+            elif len(values) == 4:
+                func = values[0]
+                arg = values[2]
+                if func == 'sin':
+                    return np.sin(arg)
+                elif func == 'cos':
+                    return np.cos(arg)
+                elif func == 'tg':
+                    return np.tan(arg)
+                elif func == 'arcsin':
+                    return np.arcsin(arg)
+                elif func == 'arccos':
+                    return np.arccos(arg)
+                elif func == 'arctg':
+                    return np.arctan(arg)
+                elif func == 'exp':
+                    return np.exp(arg)
+                elif func == 'ln':
+                    return np.log(arg)
+        return values[0]
+
+    def build_tree(self, lhs, values):
+        if lhs == 'E':
+            if len(values) == 1:
+                return values[0]
+            elif values[1].value == '+':
+                return Node('+', values[0], values[2])
+            elif values[1].value == '-':
+                return Node('-', values[0], values[2])
+        elif lhs == 'T':
+            if len(values) == 1:
+                return values[0]
+            elif values[1].value == '*':
+                return Node('*', values[0], values[2])
+            elif values[1].value == '/':
+                return Node('/', values[0], values[2])
+        elif lhs == 'F':
+            if len(values) == 1:
+                return values[0]
+            elif values[1].value == '^':
+                return Node('^', values[0], values[2])
+        elif lhs == 'G':
+            if len(values) == 1:
+                return values[0]
+            elif len(values) == 2:
+                return Node('-', None, values[1])
+            elif values[0].value == '(':
+                return values[1]
+            elif len(values) == 4:
+                func = values[0].value
+                arg = values[2]
+                return Node(func, None, arg)
+        return values[0]
 
 class Node:
     def __init__(self, value, left=None, right=None):
@@ -77,311 +255,121 @@ class Node:
         else:
             raise ValueError(f"Unsupported operation: {self.value}")
 
-
-class LRParser:
-    def __init__(self, parsing_table, X):
-        self.parsing_table = parsing_table
-        self.X = X
-
-    def parse(self, tokens, mode):
-        states_stack = [0]
-        index = 0
-        token = tokens[index]
-        value_stack = []
-
-        while True:
-            state = int(states_stack[-1])
-            tableColNames = token[1]
-            if token[0] == "NUMBER":
-                tableColNames = token[0]
-            if tableColNames in self.parsing_table[str(state)]:
-                action = self.parsing_table[str(state)][tableColNames]
-                if action.startswith('s'):
-                    # Shift
-                    next_state = int(action[1:])
-                    states_stack.append(next_state)
-                    if token[0] == 'VAR':
-                        if mode == EVAL:
-                            value_stack.append(self.X)
-                        elif mode == DERIVATIVE:
-                            value_stack.append(Node('X'))
-                    else:
-                        if mode == EVAL:
-                            value_stack.append(token[1])
-                        elif mode == DERIVATIVE:
-                            value_stack.append(Node(token[1]))
-                    index += 1
-                    token = tokens[index]
-                elif action.startswith('r'):
-                    # Reduce
-                    production = action[1:].strip()
-                    if production.startswith('(') and production.endswith(')'):
-                        production = production[1:-1].strip()
-                    lhs, rhs = production.split(' -> ')
-                    rhs_symbols = rhs.split()
-
-                    valuesToReduce = []
-                    for _ in rhs_symbols:
-                        states_stack.pop()
-                        valuesToReduce.append(value_stack.pop())
-
-                    valuesToReduce.reverse()
-                    if mode == EVAL:
-                        result = self.evaluate(lhs, valuesToReduce)
-                    else:  # mode == DERIVATE
-                        result = self.build_tree(lhs, valuesToReduce)
-
-                    state = states_stack[-1]
-                    states_stack.append(self.parsing_table[str(state)][lhs])
-                    value_stack.append(result)
-                elif action == 'acc':
-                    # Accept
-                    if mode == EVAL:
-                        return value_stack[0]
-                    else:  # mode == DERIVATE
-                        return tree_to_string(value_stack[0].differentiate())
-
-                else:
-                    raise RuntimeError(f'Unknown action: {action}')
-            else:
-                raise RuntimeError(f'Unexpected token: {token}')
-
-    def build_tree(self, lhs, values):
-        if lhs == 'E':
-            if len(values) == 1:
-                return values[0]
-            elif values[1].value == '+':
-                return Node('+', values[0], values[2])
-            elif values[1].value == '-':
-                return Node('-', values[0], values[2])
-        elif lhs == 'T':
-            if len(values) == 1:
-                return values[0]
-            elif values[1].value == '*':
-                return Node('*', values[0], values[2])
-            elif values[1].value == '/':
-                return Node('/', values[0], values[2])
-        elif lhs == 'F':
-            if len(values) == 1:
-                return values[0]
-            elif values[1].value == '^':
-                return Node('^', values[0], values[2])
-        elif lhs == 'G':
-            if len(values) == 1:
-                return values[0]
-            elif len(values) == 2:
-                return Node('-', None, values[1])
-            elif values[0].value == '(':
-                return values[1]
-            elif len(values) == 4:
-                func = values[0].value
-                arg = values[2]
-                return Node(func, None, arg)
-        return values[0]
-
-    def evaluate(self, lhs, values):
-        if lhs == 'E':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '+':
-                return values[0] + values[2]
-            elif values[1] == '-':
-                return values[0] - values[2]
-        elif lhs == 'T':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '*':
-                return values[0] * values[2]
-            elif values[1] == '/':
-                return values[0] / values[2]
-        elif lhs == 'F':
-            if len(values) == 1:
-                return values[0]
-            elif values[1] == '^':
-                return values[0] ** values[2]
-        elif lhs == 'G':
-            if len(values) == 1:
-                return values[0]
-            elif len(values) == 2:
-                return -values[1]
-            elif values[0] == '(':
-                return values[1]
-            elif len(values) == 4:
-                func = values[0]
-                arg = values[2]
-                if func == 'sin':
-                    return np.sin(arg)
-                elif func == 'cos':
-                    return np.cos(arg)
-                elif func == 'tg':
-                    return np.tan(arg)
-                elif func == 'arcsin':
-                    return np.arcsin(arg)
-                elif func == 'arccos':
-                    return np.arccos(arg)
-                elif func == 'arctg':
-                    return np.arctan(arg)
-                elif func == 'exp':
-                    return np.exp(arg)
-                elif func == 'ln':
-                    return np.log(arg)
-        return values[0]
+    def tree_to_string(self):
+        if self.left is None and self.right is None:
+            return str(self.value)
+        left_str = self.left.tree_to_string() if self.left else ""
+        right_str = self.right.tree_to_string() if self.right else ""
+        if self.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]:
+            return f"{left_str} {self.value} ({right_str})"
+        return f"({left_str} {self.value} {right_str})"
 
 
-def tokenize(expression):
-    tokens = []
-    i = 0
-    while i < len(expression):
-        char = expression[i]
+def evaluate_expression_traditionally(expression, x_value): # for texting functionality
+    import math
+    import time
+    # Define local variables to be used in eval
+    local_vars = {
+        "X": x_value,
+        "math": math
+    }
 
-        if char.isdigit() or (char == '.' and i + 1 < len(expression) and expression[i + 1].isdigit()):
-            # Recognize numbers (integer and floating-point)
-            num = char
-            i += 1
-            while i < len(expression) and (expression[i].isdigit() or expression[i] == '.'):
-                num += expression[i]
-                i += 1
-            tokens.append(('NUMBER', float(num) if '.' in num else int(num)))
+    # Replace operations with math equivalents
+    expression = expression.replace("arcsin", "math.asin").replace("arccos", "math.acos").replace("arctg", "math.atan").replace("sin", "math.sin").replace("cos", "math.cos").replace("tg", "math.tan").replace("exp", "math.exp").replace("ln", "math.log").replace("^", "**")
 
-        elif char == "X":
-            tokens.append(('VAR', char))
-            i += 1
+    # Start timing
+    start_time = time.time()
 
-        elif char.isalpha():
-            # Recognize functions
-            func = char
-            i += 1
-            while i < len(expression) and expression[i].isalpha():
-                func += expression[i]
-                i += 1
-            tokens.append(('FUNCTION', func))
-        elif char in '+-*/^()':
-            # Recognize operators and parentheses
-            tokens.append(('OP', char))
-            i += 1
-        elif char in ' \t':
-            # Skip whitespace
-            i += 1
-        else:
-            raise RuntimeError(f'Unexpected character: {char}')
+    # Evaluate the expression using eval and the dictionary of local variables
+    result = eval(expression, {}, local_vars)
 
-    tokens.append(('$', '$'))
-    return tokens
+    # End timing
+    end_time = time.time()
+
+    # Calculate the execution time
+    execution_time = end_time - start_time
+
+    return result, execution_time
+
+
+def differentiate_expression_traditionally(expression): # for texting functionality
+    import time
+    import sympy as sp
+    # Define the symbol X
+    X = sp.symbols('X')
+
+    # Parse the expression into a SymPy expression
+    sympy_expr = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
+
+    # Start timing
+    start_time = time.time()
+
+    # Differentiate the expression with respect to X
+    derivative = sp.diff(sympy_expr, X)
+
+    # End timing
+    end_time = time.time()
+
+    # Calculate the execution time
+    execution_time = end_time - start_time
+
+    return derivative, execution_time
 
 
 def main():
+    import time # for testing
     parsing_table = get_parsing_table()
+    x_value = 2
 
-    expressions1 = [
-        "X+6",
-        "sin(X)",
-        "3 + 4",
-        "(3 + 4)",
-        "(2 * (3 + 4))",
-        "(5 - 3)",
-        "((2 + 3) * (4 - 1))",
-        "-6",
-        "sin(X)",
-        "X^3",
-        "cos(X)",
-        "tg(X)",
-        "arcsin(X)",
-        "arccos(X)",
-        "arctg(X)",
-        "exp(X)",
-        "ln(X)",
-        "sin(2*X)",
-        "cos(2*X)",
-        "sin(2*cos(2*X)^(2*X))",
-        "-6",
-        "X",
-        "-X",
-        "8",
-        "X + 8",
-        "3*X",
-        "X^2",
-        "X^2 + 3*X + 1",
-        "X^3",
-        "X^2 * X + 3",
-        "(X + 1)^2",
-        "(2*X + 1)^2",
-        "X^2 / X^2",
-    ]
-    '''
-    value at x = 1: -10968.1737085657 + 38116.0419579044*I
-    '''
-    expressions = [
-#        "ln(2*X)",
-#        "exp(2*X)",
-#        "arcsin(2*X)",
-#        "arccos(2*X)",
-#        "arctg(2*X)",
-#
-#        "tg(2*X)",
-#        "((((((((((((((((X ^ 7.0) * ((7.0 * (1 / X)) + (ln (X) * 0))) + (1 + (((((((0 * 2.0) + (11.0 * 0)) * X) + ((11.0 * 2.0) * 1)) * 4.0) - (((11.0 * 2.0) * X) * 0)) / (4.0 ^ 2)))) + (cos ((X * 2.0)) * ((1 * 2.0) + (X * 0)))) + ((-1 * sin (sin (X))) * (cos (X) * 1))) - ((((1 / (81.0 * X)) * ((0 * X) + (81.0 * 1))) * exp (2.0)) + (ln ((81.0 * X)) * (exp (2.0) * 0)))) + ((((1 / (1 + ((X / 7.0) ^ 2))) * (((1 * 7.0) - (X * 0)) / (7.0 ^ 2))) * (11.0 - (2.0 * (X ^ 3.0)))) + (arctg ((X / 7.0)) * (0 - ((0 * (X ^ 3.0)) + (2.0 * ((X ^ 3.0) * ((3.0 * (1 / X)) + (ln (X) * 0))))))))) - (((((0 * exp (X)) + (63.0 * (exp (X) * 1))) * 9.0) - ((63.0 * exp (X)) * 0)) / (9.0 ^ 2))) + ((1 / (cos ((18.0 ^ (4.0 * X))) ^ 2)) * ((18.0 ^ (4.0 * X)) * (((4.0 * X) * (0 / 18.0)) + (ln (18.0) * ((0 * X) + (4.0 * 1))))))) - (((((((-1 * sin ((X - 6.0))) * (1 - 0)) * 5.0) - (cos ((X - 6.0)) * 0)) / (5.0 ^ 2)) * X) + ((cos ((X - 6.0)) / 5.0) * 1))) + ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1)))) - ((X ^ (X ^ X)) * (((X ^ X) * (1 / X)) + (ln (X) * ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1))))))) + ((X ^ (2.0 ^ X)) * (((2.0 ^ X) * (1 / X)) + (ln (X) * ((2.0 ^ X) * ((X * (0 / 2.0)) + (ln (2.0) * 1))))))) - ((X ^ (X ^ (X ^ X))) * (((X ^ (X ^ X)) * (1 / X)) + (ln (X) * ((X ^ (X ^ X)) * (((X ^ X) * (1 / X)) + (ln (X) * ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1)))))))))) - ((((((0 * X) + (2.0 * 1)) * 17.0) + ((2.0 * X) * 0)) * sin (((8.0 * X) - 13.0))) + (((2.0 * X) * 17.0) * (cos (((8.0 * X) - 13.0)) * (((0 * X) + (8.0 * 1)) - 0))))) + 0)",
-#        "X^2",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
-        "3+4",
-        "X^3 + sin(X) - 3.14",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)",  # 103.265
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9",  # 50.1501
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)+X^X",
-        # 53.7063
-        "X^X^X",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X-2*X*17*sin(8*X-13)",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)",
-        # "arcsin((76/(4^11+80*9))*X)+546-38*X/11*(X-4)+ln(8*X/11)-arccos((93/7654326543)*X)",
-        "cos(11*(X^2-3*X^3+X+81))/X-41+X^5-287*48/X+tg(59*X-198)",
-        "sin(80)",
-    ]
+    expression = "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
 
-    # expressions[0].replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atan", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
-    # X = -1.9286689276512163
-    X = 2
-    parser = LRParser(parsing_table, X)
-    for expression in expressions:
-        try:
-            # print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
+    try:
+        print(f"\nf(X) = {expression}")
+        print(f"len of expression f(X): {len(expression)}\n")
 
-            expression = expression.replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos",
-                                                                                                              "arccos").replace(
-                "atg", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
-            print(f"len of expression: {len(expression)}")
+        # tokenize and create parser
+        start_time = time.time()
+        tokens = tokenize(expression)
+        parser = LRParser(parsing_table, x_value)
+        end_time = time.time()
+        print(f"Tokenizer time: {(end_time - start_time):.8f} seconds.\n")
 
-            tokens = tokenize(expression)
-            # Evaluate
-            print(f"f(x) = {expression}")
-            evaluate_expression = parser.parse(tokens, EVAL)
-            print(f"Eval(f({X})) = {evaluate_expression:.4f}".rstrip('0').rstrip('.'))
+        # Evaluate f(x)
+        start_time = time.time()
+        evaluate_expression = parser.parse(tokens, EVAL)
+        print(f"Eval(f({x_value})) = {evaluate_expression:.10f}".rstrip('0').rstrip('.'))
+        end_time = time.time()
+        print(f"Evaluation time: {(end_time - start_time):.8f} seconds.\n")
 
-            differentiated = parser.parse(tokens, DERIVATIVE)
-            print(f"Diff(f(x)) = {differentiated}")
+        # Derivative
+        start_time = time.time()
+        differentiated = parser.parse(tokens, DERIVATIVE)
+        print(f"Diff(f(x)) = {differentiated}")
+        end_time = time.time()
+        print(f"Differentiate time: {(end_time - start_time):.8f} seconds.\n")
 
-            tokens_for_differentiated = tokenize(differentiated)
-            evaluate_differentiated = parser.parse(tokens_for_differentiated, EVAL)
-            print(f"Diff(f({X})) = {evaluate_differentiated:.4f}".rstrip('0').rstrip('.'))
+        # tokenize and eval the derivative
+        tokens_for_differentiated = tokenize(differentiated)
+        evaluate_differentiated = parser.parse(tokens_for_differentiated, EVAL)
+        print(f"Diff(f({x_value})) = {evaluate_differentiated:.10f}".rstrip('0').rstrip('.'))
 
-            ###################################
 
-            import sympy as sp
-            x = sp.symbols('X')
+        # Testing Results:
+        print("\n -- Testing the result compare to Python's Eval function and Sumpy's Diff ans Subs --")
+        result, eval_time = evaluate_expression_traditionally(expression, x_value)
+        print(f"Python's Eval time: {eval_time:.8f} seconds and the result is: {result}")
 
-            print("########################")
-            derivative_us = sp.sympify(differentiated.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
-            print(f"derivative_us: {derivative_us}")
-            expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
-            print(f"expression_sp: {expression_sp}")
+        derivative, diff_time = differentiate_expression_traditionally(expression)
+        print(f"Sumpy's differentiation time: {diff_time:.8f} seconds.")
 
-            derivative_sp = sp.diff(expression_sp, x)
-            print(f"derivative_sp: {derivative_sp}")
+        import sympy as sp
+        x = sp.symbols('X')
+        result = derivative.subs(x, 2).evalf()
+        print(f"Python's Eval of f'(X) is: {result}")
 
-            print(f"Are they equivalent? {derivative_us.subs(x, 2).evalf(4) == derivative_sp.subs(x, 2).evalf(4)}")
 
-            print()
-        except RuntimeError as e:
-            print(f"Error parsing expression '{expression}': {e}")
+    except RuntimeError as e:
+        print(f"Error parsing expression '{expression}': {e}")
 
 
 if __name__ == "__main__":

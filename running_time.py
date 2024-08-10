@@ -2,7 +2,7 @@ import sympy as sp
 import time
 
 
-def evaluate_expression(expression, x_value):
+def evaluate_expression_traditionally(expression, x_value):
     # Create a dictionary with X set to the given value
     local_vars = {"X": x_value}
 
@@ -21,7 +21,7 @@ def evaluate_expression(expression, x_value):
     return result, execution_time
 
 
-def differentiate_expression(expression):
+def differentiate_expression_traditionally(expression):
     # Define the symbol X
     X = sp.symbols('X')
 
@@ -45,18 +45,18 @@ def differentiate_expression(expression):
 
 def main():
     # Example expression
-    expression = "X**2 + 5"
+    # expression = "X**2 + 5"
 
     # Example value for X
     x_value = 2
 
     # Evaluate the expression
-    result, eval_time = evaluate_expression(expression, x_value)
+    result, eval_time = evaluate_expression_traditionally(expression, x_value)
     print(f"The result of the expression '{expression}' with X={x_value} is: {result}")
     print(f"Evaluation time: {eval_time:.8f} seconds")
 
     # Differentiate the expression
-    derivative, diff_time = differentiate_expression(expression)
+    derivative, diff_time = differentiate_expression_traditionally(expression)
     print(f"The derivative of the expression '{expression}' with respect to X is: {derivative}")
     print(f"Differentiation time: {diff_time:.8f} seconds")
 
