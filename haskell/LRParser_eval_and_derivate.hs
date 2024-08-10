@@ -1,6 +1,8 @@
 import qualified Data.Map as Map
+import Data.Time.Clock
 
----------------------------------------------------------------------------
+
+------------------------------------------------
 -- tokenizer
 data Token = NUMBER Double
            | VAR Char
@@ -363,7 +365,7 @@ treeToString (Node val Nothing Nothing) = val
 treeToString (Node val left right) =
     let leftStr  = maybe "" treeToString left
         rightStr = maybe "" treeToString right
-    in if val `elem` ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp", "-"]
+    in if val `elem` ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]
        then leftStr ++ " " ++ val ++ " (" ++ rightStr ++ ")"
        else "(" ++ leftStr ++ " " ++ val ++ " " ++ rightStr ++ ")"
 
@@ -383,16 +385,28 @@ applyFunction funcName _ = error $ "Unknown function: " ++ funcName
 -- More functions as needed
 main :: IO ()
 main = do
+    tt_start <- getCurrentTime
     let parser = LRParser getParsingTable 2.0  -- Let's assume X = 2.0 for this example
     let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
+    tt_end <- getCurrentTime
+    let lrParserTokenizeRunTime =  diffUTCTime tt_end tt_start
+    print ("LRParser + tokenize runtime = " ++ show lrParserTokenizeRunTime)
+    tt_start <- getCurrentTime
     case parse parser tokens EVAL of
         Right result -> putStrLn $ "EVAL: " ++ show result
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
-    
+    tt_end <- getCurrentTime
+    let evalRunTime =  diffUTCTime tt_end tt_start
+    print ("EVAL runtime = " ++ show evalRunTime)
+
     -- Then, evaluate in DERIVATIVE mode
+    tt_start <- getCurrentTime
     case parse parser tokens DERIVATIVE of
         Right (ValString resultDERIVATIVE) -> do
             putStrLn $ "DERIVATIVE: " ++ resultDERIVATIVE
+            tt_end <- getCurrentTime
+            let derivativeRunTime =  diffUTCTime tt_end tt_start
+            print ("DERIVATIVE runtime = " ++ show derivativeRunTime)
             -- Now parse the derivative result in EVAL mode
             let derivativeTokens = tokenize resultDERIVATIVE
             case parse parser derivativeTokens EVAL of
