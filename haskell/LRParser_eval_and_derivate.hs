@@ -41,8 +41,8 @@ type Action = String
 
 type ParsingTable = Map.Map State (Map.Map Symbol Action)
 
-getParsingTable3 :: ParsingTable
-getParsingTable3 = Map.fromList
+getParsingTable :: ParsingTable
+getParsingTable = Map.fromList
     [ ("0",  Map.fromList 
         [ ("(", "s5"), ("-", "s6"), ("NUMBER", "s8"), ("X", "s9"), ("arccos", "s14"), 
           ("arcsin", "s13"), ("arctg", "s15"), ("cos", "s11"), ("exp", "s16"), ("ln", "s17"), 
@@ -383,7 +383,7 @@ applyFunction funcName _ = error $ "Unknown function: " ++ funcName
 -- More functions as needed
 main :: IO ()
 main = do
-    let parser = LRParser getParsingTable3 2.0  -- Let's assume X = 2.0 for this example
+    let parser = LRParser getParsingTable 2.0  -- Let's assume X = 2.0 for this example
     let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
     case parse parser tokens EVAL of
         Right result -> putStrLn $ "EVAL: " ++ show result

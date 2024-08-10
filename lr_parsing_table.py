@@ -1,4 +1,4 @@
-def get_parsing_table3():
+def get_parsing_table():
     parsing_table = {
         '0': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 1, 'T': 2, 'F': 3, 'G': 4,

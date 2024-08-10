@@ -1,5 +1,5 @@
 import numpy as np
-from lr_parsing_table import get_parsing_table3
+from lr_parsing_table import get_parsing_table
 
 EVAL = 'eval'
 DERIVATIVE = 'derivative'
@@ -270,7 +270,7 @@ def tokenize(expression):
 
 
 def main():
-    parsing_table = get_parsing_table3()
+    parsing_table = get_parsing_table()
 
     expressions1 = [
         "X+6",
