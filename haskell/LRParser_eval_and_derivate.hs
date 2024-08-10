@@ -1,5 +1,4 @@
 import qualified Data.Map as Map
-import Debug.Trace
 
 ---------------------------------------------------------------------------
 -- tokenizer
@@ -154,14 +153,9 @@ getParsingTable3 = Map.fromList
 
 lookupAction :: State -> Symbol -> ParsingTable -> Maybe Action
 lookupAction state symbol table = 
-    trace (debugMessage state symbol result) result
-  where
-    result = case Map.lookup state table of
-                Just actions -> Map.lookup symbol actions
-                Nothing -> Nothing
-
-    debugMessage :: State -> Symbol -> Maybe Action -> String
-    debugMessage st sym res = "lookupAction called with State: " ++ show st ++ ", Symbol: " ++ show sym ++ ", Result: " ++ show res
+    case Map.lookup state table of
+        Just actions -> Map.lookup symbol actions
+        Nothing -> Nothing
 
 
 ---------------------------------------------------------------------------
@@ -193,8 +187,6 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
         parse' (state:states) (token:tokens) values =
             case lookupAction (show state) (tableColNames token) (parsingTable parser) of
                 Just action ->
-                    -- Print the current state, token, and action
-                    trace ("State: " ++ show state ++ ", Token: " ++ show token ++ ", Action: " ++ action) $
                     if take 1 action == "s" then
                         -- Shift operation
                         let nextState = read (drop 1 action) :: Int
@@ -211,8 +203,7 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                                     FUNCTION f  -> ValString f : values
                                     OP op       -> ValString [op] : values
                                     _           -> error "Unexpected token type"
-                        in trace ("Shift to state: " ++ show nextState ++ ",(nextState : state : states): " ++ show (nextState : state : states) ++ ", Values: " ++ show newValues) $
-                            parse' (nextState : state : states) tokens newValues
+                        in parse' (nextState : state : states) tokens newValues
                     else if take 1 action == "r" then
                         -- Reduce operation
                         let (lhs, rhs) = parseProduction action
@@ -228,27 +219,19 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                                 Nothing         -> error "Failed to find next state during reduction"
                             newValues = result : remainingValues
                             -- Add newState to states stack
-                            
                             updatedStates = newState : remainingStats
-                        -- Print the reduction and new state
-                        in trace ("Reduce using " ++ action ++ ",valuesToReduce: " ++ show valuesToReduce ++ ",result: "++ show result ++ ", New state: " ++ show newState ++ ", updatedStates: " ++ show updatedStates ++ ", Values: " ++ show newValues) $
-                            parse' updatedStates (token:tokens) newValues
+                        in parse' updatedStates (token:tokens) newValues
                     else if action == "acc" then
-                        trace "Accept action reached, parsing complete." $
                         if mode == EVAL 
                             then Right (head values)  -- Final result in EVAL mode
                             else case head values of  -- Mode DERIVATIVE
                                 ValNode node -> Right (ValString (treeToString (differentiate node)))
                                 _ -> error "Expected a node in DERIVATIVE mode"
-
-
                     else
-                        trace ("Unknown action: " ++ action) $
                         Left "Unknown action"
-                Nothing -> trace "Parsing error: no action found." $
-                            Left "Parsing error"
-        parse' _ [] _ = trace "Incomplete input: no more tokens left." $
-                        Left "Incomplete input"
+                Nothing -> Left "Parsing error"          
+        parse' _ [] _ = Left "Incomplete input"
+                        
 
         tableColNames :: Token -> String
         tableColNames (NUMBER _) = "NUMBER"
@@ -402,12 +385,6 @@ main :: IO ()
 main = do
     let parser = LRParser getParsingTable3 2.0  -- Let's assume X = 2.0 for this example
     let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
-    --let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)"
-    --print tokens
-    -- arcsin' -> 
-    --((1 / (1 - (((2 * X) ^ 2)) ^ 0.5)) * ((0 * X) + (2 * 1))) -- python
-    --((1 / ((1 - ((2.0 * X) ^ 2)) ^ 0.5)) * ((0 * X) + (2.0 * 1))) -- haskell
-    -- First, evaluate in EVAL mode
     case parse parser tokens EVAL of
         Right result -> putStrLn $ "EVAL: " ++ show result
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
@@ -423,5 +400,3 @@ main = do
                 Left errorMsg -> putStrLn $ "Error during evaluation of derivative: " ++ errorMsg
         Right _ -> putStrLn "DERIVATIVE did not produce a string."
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
-
-

@@ -1,5 +1,3 @@
-# save 02/08/2024 10:30
-# evaluation working
 import numpy as np
 from lr_parsing_table import get_parsing_table3
 
@@ -96,14 +94,8 @@ class LRParser:
             tableColNames = token[1]
             if token[0] == "NUMBER":
                 tableColNames = token[0]
-            # print()
-            # print(f"states_stack==states = {states_stack}")
-            # print(f"value_stack==valuesToReduce = {value_stack}")
-            # print(f"str(state): {str(state)},tableColNames: {tableColNames}")
             if tableColNames in self.parsing_table[str(state)]:
                 action = self.parsing_table[str(state)][tableColNames]
-                # print(f"action:{action}")
-
                 if action.startswith('s'):
                     # Shift
                     next_state = int(action[1:])
@@ -140,7 +132,6 @@ class LRParser:
                         result = self.build_tree(lhs, valuesToReduce)
 
                     state = states_stack[-1]
-                    # print(f"self.parsing_table[str({state})][{lhs}]: {self.parsing_table[str(state)][lhs]}")
                     states_stack.append(self.parsing_table[str(state)][lhs])
                     value_stack.append(result)
                 elif action == 'acc':
@@ -167,19 +158,13 @@ class LRParser:
             if len(values) == 1:
                 return values[0]
             elif values[1].value == '*':
-                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                #    return Node(values[0].value * values[2].value)
                 return Node('*', values[0], values[2])
             elif values[1].value == '/':
-                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                 #   return Node(values[0].value / values[2].value)
                 return Node('/', values[0], values[2])
         elif lhs == 'F':
             if len(values) == 1:
                 return values[0]
             elif values[1].value == '^':
-                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                #    return Node(values[0].value ** values[2].value)
                 return Node('^', values[0], values[2])
         elif lhs == 'G':
             if len(values) == 1:
