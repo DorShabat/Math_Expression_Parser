@@ -3,7 +3,6 @@
 import numpy as np
 from lr_parsing_table import get_parsing_table3
 
-
 EVAL = 'eval'
 DERIVATIVE = 'derivative'
 
@@ -16,6 +15,7 @@ def tree_to_string(node):
     if node.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]:
         return f"{left_str} {node.value} ({right_str})"
     return f"({left_str} {node.value} {right_str})"
+
 
 class Node:
     def __init__(self, value, left=None, right=None):
@@ -91,19 +91,18 @@ class LRParser:
         token = tokens[index]
         value_stack = []
 
-
         while True:
             state = int(states_stack[-1])
             tableColNames = token[1]
             if token[0] == "NUMBER":
                 tableColNames = token[0]
-            #print()
-            #print(f"states_stack==states = {states_stack}")
-            #print(f"value_stack==valuesToReduce = {value_stack}")
-            #print(f"str(state): {str(state)},tableColNames: {tableColNames}")
+            # print()
+            # print(f"states_stack==states = {states_stack}")
+            # print(f"value_stack==valuesToReduce = {value_stack}")
+            # print(f"str(state): {str(state)},tableColNames: {tableColNames}")
             if tableColNames in self.parsing_table[str(state)]:
                 action = self.parsing_table[str(state)][tableColNames]
-                #print(f"action:{action}")
+                # print(f"action:{action}")
 
                 if action.startswith('s'):
                     # Shift
@@ -141,7 +140,7 @@ class LRParser:
                         result = self.build_tree(lhs, valuesToReduce)
 
                     state = states_stack[-1]
-                    #print(f"self.parsing_table[str({state})][{lhs}]: {self.parsing_table[str(state)][lhs]}")
+                    # print(f"self.parsing_table[str({state})][{lhs}]: {self.parsing_table[str(state)][lhs]}")
                     states_stack.append(self.parsing_table[str(state)][lhs])
                     value_stack.append(result)
                 elif action == 'acc':
@@ -329,29 +328,32 @@ def main():
     expressions = [
         "3+4",
         "X^3 + sin(X) - 3.14",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)", #103.265
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9", #50.1501
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)",  # 103.265
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9",  # 50.1501
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)+X^X", #53.7063
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)+X^X",
+        # 53.7063
         "X^X^X",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X-2*X*17*sin(8*X-13)",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
-        #"arcsin((76/(4^11+80*9))*X)+546-38*X/11*(X-4)+ln(8*X/11)-arccos((93/7654326543)*X)",
+        # "arcsin((76/(4^11+80*9))*X)+546-38*X/11*(X-4)+ln(8*X/11)-arccos((93/7654326543)*X)",
         "cos(11*(X^2-3*X^3+X+81))/X-41+X^5-287*48/X+tg(59*X-198)",
         "sin(80)",
     ]
 
-    #expressions[0].replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atan", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
-    #X = -1.9286689276512163
+    # expressions[0].replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atan", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
+    # X = -1.9286689276512163
     X = 2
     parser = LRParser(parsing_table, X)
     for expression in expressions:
         try:
-            #print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
+            # print(f"sp: {sp.sympify(expression).evalf(subs={x: X})}")
 
-            expression = expression.replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos", "arccos").replace("atg", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
+            expression = expression.replace("**", "^").replace("tan", "tg").replace("asin", "arcsin").replace("acos",
+                                                                                                              "arccos").replace(
+                "atg", "arctg").replace("log", "ln").replace("pi", "3.141592653589793")
             print(f"len of expression: {len(expression)}")
 
             tokens = tokenize(expression)
@@ -359,7 +361,6 @@ def main():
             print(f"f(x) = {expression}")
             evaluate_expression = parser.parse(tokens, EVAL)
             print(f"Eval(f({X})) = {evaluate_expression:.4f}".rstrip('0').rstrip('.'))
-
 
             differentiated = parser.parse(tokens, DERIVATIVE)
             print(f"Diff(f(x)) = {differentiated}")
