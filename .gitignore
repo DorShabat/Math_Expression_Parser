@@ -1,3 +1,9 @@
 
 /.idea
 __pycache__/lr_parsing_table.cpython-312.pyc
+haskell/LRParser_eval_and_derivate.exe
+haskell/LRParser_eval_and_derivate.hi
+haskell/tempCodeRunnerFile.hi
+haskell/tempCodeRunnerFile.o
+haskell/tempCodeRunnerFile.exe
+haskell/LRParser_eval_and_derivate.o

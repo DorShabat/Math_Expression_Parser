@@ -1,8 +1,6 @@
 import qualified Data.Map as Map
 import Data.Time.Clock
 
-
-------------------------------------------------
 -- tokenizer
 data Token = NUMBER Double
            | VAR Char
@@ -276,6 +274,18 @@ evaluate _ _ (v:_) = v
 evaluate _ _ _ = error "Unknown evaluation"
 
 
+applyFunction :: String -> Double -> Double
+applyFunction "sin" arg = sin(arg)
+applyFunction "cos" arg = cos(arg)
+applyFunction "tg" arg  = tan(arg)
+applyFunction "ln" arg  = log(arg)
+applyFunction "exp" arg = exp(arg)
+applyFunction "arcsin" arg = asin(arg)
+applyFunction "arccos" arg = acos(arg)
+applyFunction "arctg"  arg = atan(arg)
+applyFunction funcName _ = error $ "Unknown function: " ++ funcName
+
+
 build_tree :: LRParser -> String -> [Value] -> Value
 build_tree _ "E" [v] = v
 build_tree _ "E" [ValNode n1, ValString "+", ValNode n2] = ValNode (Node "+" (Just n1) (Just n2))
@@ -370,47 +380,53 @@ treeToString (Node val left right) =
        else "(" ++ leftStr ++ " " ++ val ++ " " ++ rightStr ++ ")"
 
 
-applyFunction :: String -> Double -> Double
-applyFunction "sin" arg = sin(arg)
-applyFunction "cos" arg = cos(arg)
-applyFunction "tg" arg  = tan(arg)
-applyFunction "ln" arg  = log(arg)
-applyFunction "exp" arg = exp(arg)
-applyFunction "arcsin" arg = asin(arg)
-applyFunction "arccos" arg = acos(arg)
-applyFunction "arctg"  arg = atan(arg)
-applyFunction funcName _ = error $ "Unknown function: " ++ funcName
+
 
 
 -- More functions as needed
+
 main :: IO ()
 main = do
-    tt_start <- getCurrentTime
-    let parser = LRParser getParsingTable 2.0  -- Let's assume X = 2.0 for this example
-    let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
-    tt_end <- getCurrentTime
-    let lrParserTokenizeRunTime =  diffUTCTime tt_end tt_start
-    print ("LRParser + tokenize runtime = " ++ show lrParserTokenizeRunTime)
-    tt_start <- getCurrentTime
+    tt_start_tokenize <- getCurrentTime
+    let x_value = 2.0
+    let expression = "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
+    
+    putStrLn ("f(X) = " ++ expression)
+    putStrLn ("len of expression f(X): " ++ show (length expression))
+
+    let parser = LRParser getParsingTable x_value  -- Assuming X = 2.0 for this example
+    let tokens = tokenize expression
+    
+    tt_end_tokenize <- getCurrentTime
+    let lrParserTokenizeRunTime = diffUTCTime tt_end_tokenize tt_start_tokenize
+    putStrLn ("\nTokenizer time: " ++ show lrParserTokenizeRunTime)
+
+    -- Evaluate f(X) , X = x_value
+    tt_start_eval <- getCurrentTime
     case parse parser tokens EVAL of
-        Right result -> putStrLn $ "EVAL: " ++ show result
-        Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
-    tt_end <- getCurrentTime
-    let evalRunTime =  diffUTCTime tt_end tt_start
-    print ("EVAL runtime = " ++ show evalRunTime)
+        Right (ValDouble result) -> do
+            tt_end_eval <- getCurrentTime
+            let evalRunTime = diffUTCTime tt_end_eval tt_start_eval
+            putStrLn $ "\nEval(f(" ++ show x_value ++ ")) = " ++ show result
+            putStrLn $ "Evaluation time: " ++ show evalRunTime
+        Left errorMsg -> do
+            tt_end_eval <- getCurrentTime
+            let evalRunTime = diffUTCTime tt_end_eval tt_start_eval
+            putStrLn $ "Error: " ++ errorMsg
+            putStrLn $ "Evaluation time: " ++ show evalRunTime
 
     -- Then, evaluate in DERIVATIVE mode
-    tt_start <- getCurrentTime
+    tt_start_derivative <- getCurrentTime
     case parse parser tokens DERIVATIVE of
-        Right (ValString resultDERIVATIVE) -> do
-            putStrLn $ "DERIVATIVE: " ++ resultDERIVATIVE
-            tt_end <- getCurrentTime
-            let derivativeRunTime =  diffUTCTime tt_end tt_start
-            print ("DERIVATIVE runtime = " ++ show derivativeRunTime)
+        Right (ValString derivative) -> do
+            tt_end_derivative <- getCurrentTime
+            let derivativeRunTime = diffUTCTime tt_end_derivative tt_start_derivative
+            putStrLn $ "\nDiff(f(X)) = " ++ derivative
+            putStrLn $ "Differentiate time: " ++ show derivativeRunTime
             -- Now parse the derivative result in EVAL mode
-            let derivativeTokens = tokenize resultDERIVATIVE
+            let derivativeTokens = tokenize derivative
             case parse parser derivativeTokens EVAL of
-                Right evalDERIVATIVE -> putStrLn $ "evalDERIVATIVE: " ++ show evalDERIVATIVE
+                Right (ValDouble evalDerivative) -> putStrLn $ "\nDiff(f(" ++ show x_value ++ ")) = " ++ show evalDerivative
                 Left errorMsg -> putStrLn $ "Error during evaluation of derivative: " ++ errorMsg
         Right _ -> putStrLn "DERIVATIVE did not produce a string."
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
