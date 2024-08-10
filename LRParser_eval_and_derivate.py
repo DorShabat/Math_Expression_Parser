@@ -86,24 +86,29 @@ class LRParser:
         self.X = X
 
     def parse(self, tokens, mode):
-        stack = [0]
+        states_stack = [0]
         index = 0
         token = tokens[index]
         value_stack = []
 
-        while True:
-            state = int(stack[-1])
-            token_type = token[1]
-            if token[0] == "NUMBER":
-                token_type = token[0]
 
-            if token_type in self.parsing_table[str(state)]:
-                action = self.parsing_table[str(state)][token_type]
+        while True:
+            state = int(states_stack[-1])
+            tableColNames = token[1]
+            if token[0] == "NUMBER":
+                tableColNames = token[0]
+            #print()
+            #print(f"states_stack==states = {states_stack}")
+            #print(f"value_stack==valuesToReduce = {value_stack}")
+            #print(f"str(state): {str(state)},tableColNames: {tableColNames}")
+            if tableColNames in self.parsing_table[str(state)]:
+                action = self.parsing_table[str(state)][tableColNames]
+                #print(f"action:{action}")
 
                 if action.startswith('s'):
                     # Shift
                     next_state = int(action[1:])
-                    stack.append(next_state)
+                    states_stack.append(next_state)
                     if token[0] == 'VAR':
                         if mode == EVAL:
                             value_stack.append(self.X)
@@ -124,19 +129,20 @@ class LRParser:
                     lhs, rhs = production.split(' -> ')
                     rhs_symbols = rhs.split()
 
-                    values = []
+                    valuesToReduce = []
                     for _ in rhs_symbols:
-                        stack.pop()
-                        values.append(value_stack.pop())
+                        states_stack.pop()
+                        valuesToReduce.append(value_stack.pop())
 
-                    values.reverse()
+                    valuesToReduce.reverse()
                     if mode == EVAL:
-                        result = self.evaluate(lhs, values)
+                        result = self.evaluate(lhs, valuesToReduce)
                     else:  # mode == DERIVATE
-                        result = self.build_tree(lhs, values)
+                        result = self.build_tree(lhs, valuesToReduce)
 
-                    state = stack[-1]
-                    stack.append(self.parsing_table[str(state)][lhs])
+                    state = states_stack[-1]
+                    #print(f"self.parsing_table[str({state})][{lhs}]: {self.parsing_table[str(state)][lhs]}")
+                    states_stack.append(self.parsing_table[str(state)][lhs])
                     value_stack.append(result)
                 elif action == 'acc':
                     # Accept
@@ -321,6 +327,8 @@ def main():
     value at x = 1: -10968.1737085657 + 38116.0419579044*I
     '''
     expressions = [
+        "3+4",
+        "X^3 + sin(X) - 3.14",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)", #103.265
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9", #50.1501
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(81^(4*X))-(cos(X-6)/5*X)",
@@ -361,6 +369,7 @@ def main():
             print(f"Diff(f({X})) = {evaluate_differentiated:.4f}".rstrip('0').rstrip('.'))
 
             ###################################
+
             import sympy as sp
             x = sp.symbols('X')
 

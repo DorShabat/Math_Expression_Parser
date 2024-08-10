@@ -81,5 +81,66 @@ Func -> sin
 
 read the code and tell me when you are ready for some further instructions for helping me.
 ```
+
+```
+I'm working on a project that does: an evaluation of mathematical expressions and derivative of the expression.
+it gets the expression as a string, and the value of X when X exists in the expression, 
+in the main i evaluate the expression using X and then I calculate the derivative of the expression.
+the way the evaluation works is by using the LR parser I built using the following grammar:
+E  -> E + T
+    | E - T
+    | T
+
+T  -> T * F
+    | T / F
+    | F
+
+F  -> G ^ F
+    | G
+
+G  -> ( E )
+    | - G
+    | Func ( E )
+    | NUMBER
+	| X
+
+Func -> sin
+     | cos
+     | tg
+     | arcsin
+     | arccos
+     | arctg
+     | exp
+     | ln
+
+it evaluates the expression "on the fly".
+to calculate the derivative I build an operation tree and then I calculate the derivative using the operation tree.
+
+the operations that are supported are: + , - , * , / , ^ , sin , cos , tg , arcsin , arccos , arctg , exp , ln.
+
+read the code and tell me when you are ready for some further instructions for helping me.
+```
 # Derivative
 derivative
+
+# imports we can use in husklle
+```
+import Data.Typeable
+import Debug.Trace
+import Prelude hiding
+import Prelude.Unicode
+import Data.List
+import Data.Set
+import Data.Map
+import Data.Sequence
+import Control.Monad.ST
+import Data.STRef
+import Control.Monad
+import Data.Array.Unboxed
+import Numeric.LinearAlgebra
+import Numeric.LinearAlgebra.Data
+import Numeric.LinearAlgebra.Devel
+import Numeric.LinearAlgebra.HMatrix
+import Numeric.LinearAlgebra.Static
+import Data.Time.Clock
+```
