@@ -12,7 +12,7 @@ def tree_to_string(node):
         return str(node.value)
     left_str = tree_to_string(node.left) if node.left else ""
     right_str = tree_to_string(node.right) if node.right else ""
-    if node.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]:
+    if node.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp" , "-"]:
         return f"{left_str} {node.value} ({right_str})"
     return f"({left_str} {node.value} {right_str})"
 
@@ -167,19 +167,19 @@ class LRParser:
             if len(values) == 1:
                 return values[0]
             elif values[1].value == '*':
-                if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                    return Node(values[0].value * values[2].value)
+                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
+                #    return Node(values[0].value * values[2].value)
                 return Node('*', values[0], values[2])
             elif values[1].value == '/':
-                if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                    return Node(values[0].value / values[2].value)
+                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
+                 #   return Node(values[0].value / values[2].value)
                 return Node('/', values[0], values[2])
         elif lhs == 'F':
             if len(values) == 1:
                 return values[0]
             elif values[1].value == '^':
-                if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
-                    return Node(values[0].value ** values[2].value)
+                #if isinstance(values[0].value, (int, float)) and isinstance(values[2].value, (int, float)):
+                #    return Node(values[0].value ** values[2].value)
                 return Node('^', values[0], values[2])
         elif lhs == 'G':
             if len(values) == 1:
@@ -326,6 +326,15 @@ def main():
     value at x = 1: -10968.1737085657 + 38116.0419579044*I
     '''
     expressions = [
+#        "ln(2*X)",
+#        "exp(2*X)",
+#        "arcsin(2*X)",
+#        "arccos(2*X)",
+#        "arctg(2*X)",
+#
+#        "tg(2*X)",
+#        "((((((((((((((((X ^ 7.0) * ((7.0 * (1 / X)) + (ln (X) * 0))) + (1 + (((((((0 * 2.0) + (11.0 * 0)) * X) + ((11.0 * 2.0) * 1)) * 4.0) - (((11.0 * 2.0) * X) * 0)) / (4.0 ^ 2)))) + (cos ((X * 2.0)) * ((1 * 2.0) + (X * 0)))) + ((-1 * sin (sin (X))) * (cos (X) * 1))) - ((((1 / (81.0 * X)) * ((0 * X) + (81.0 * 1))) * exp (2.0)) + (ln ((81.0 * X)) * (exp (2.0) * 0)))) + ((((1 / (1 + ((X / 7.0) ^ 2))) * (((1 * 7.0) - (X * 0)) / (7.0 ^ 2))) * (11.0 - (2.0 * (X ^ 3.0)))) + (arctg ((X / 7.0)) * (0 - ((0 * (X ^ 3.0)) + (2.0 * ((X ^ 3.0) * ((3.0 * (1 / X)) + (ln (X) * 0))))))))) - (((((0 * exp (X)) + (63.0 * (exp (X) * 1))) * 9.0) - ((63.0 * exp (X)) * 0)) / (9.0 ^ 2))) + ((1 / (cos ((18.0 ^ (4.0 * X))) ^ 2)) * ((18.0 ^ (4.0 * X)) * (((4.0 * X) * (0 / 18.0)) + (ln (18.0) * ((0 * X) + (4.0 * 1))))))) - (((((((-1 * sin ((X - 6.0))) * (1 - 0)) * 5.0) - (cos ((X - 6.0)) * 0)) / (5.0 ^ 2)) * X) + ((cos ((X - 6.0)) / 5.0) * 1))) + ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1)))) - ((X ^ (X ^ X)) * (((X ^ X) * (1 / X)) + (ln (X) * ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1))))))) + ((X ^ (2.0 ^ X)) * (((2.0 ^ X) * (1 / X)) + (ln (X) * ((2.0 ^ X) * ((X * (0 / 2.0)) + (ln (2.0) * 1))))))) - ((X ^ (X ^ (X ^ X))) * (((X ^ (X ^ X)) * (1 / X)) + (ln (X) * ((X ^ (X ^ X)) * (((X ^ X) * (1 / X)) + (ln (X) * ((X ^ X) * ((X * (1 / X)) + (ln (X) * 1)))))))))) - ((((((0 * X) + (2.0 * 1)) * 17.0) + ((2.0 * X) * 0)) * sin (((8.0 * X) - 13.0))) + (((2.0 * X) * 17.0) * (cos (((8.0 * X) - 13.0)) * (((0 * X) + (8.0 * 1)) - 0))))) + 0)",
+#        "X^2",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
         "3+4",
         "X^3 + sin(X) - 3.14",
@@ -338,7 +347,6 @@ def main():
         "X^X^X",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X-2*X*17*sin(8*X-13)",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)",
-        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
         # "arcsin((76/(4^11+80*9))*X)+546-38*X/11*(X-4)+ln(8*X/11)-arccos((93/7654326543)*X)",
         "cos(11*(X^2-3*X^3+X+81))/X-41+X^5-287*48/X+tg(59*X-198)",
         "sin(80)",
@@ -379,6 +387,8 @@ def main():
             derivative_us = sp.sympify(differentiated.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
             print(f"derivative_us: {derivative_us}")
             expression_sp = sp.sympify(expression.replace("^", "**").replace("tg", "tan").replace("arc", "a"))
+            print(f"expression_sp: {expression_sp}")
+
             derivative_sp = sp.diff(expression_sp, x)
             print(f"derivative_sp: {derivative_sp}")
 

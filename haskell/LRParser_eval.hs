@@ -171,7 +171,7 @@ data LRParser = LRParser
     , xValue   :: Double  -- This represents the value of X
     }
 
-data Mode = Eval | Derivative
+data Mode = EVAL | DERIVATIVE deriving (Eq)
 
 data Value = ValString String
            | ValDouble Double
@@ -188,72 +188,77 @@ data Node = Node
 
 parse :: LRParser -> [Token] -> Mode -> Either String Value
 parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with state 0, empty value stack
-  where
-    parse' :: [Int] -> [Token] -> [Value] -> Either String Value
-    parse' (state:states) (token:tokens) values =
-        case lookupAction (show state) (tableColNames token) (parsingTable parser) of
-            Just action ->
-                -- Print the current state, token, and action
-                trace ("State: " ++ show state ++ ", Token: " ++ show token ++ ", Action: " ++ action) $
-                if take 1 action == "s" then
-                    -- Shift operation
-                    let nextState = read (drop 1 action) :: Int
-                        newValues = case token of
-                            NUMBER n    -> ValDouble n : values
-                            VAR 'X'     -> ValDouble (xValue parser) : values
-                            FUNCTION f  -> ValString f : values
-                            OP op       -> ValString [op] : values
-                            _           -> error "Unexpected token type"
-                    in trace ("Shift to state: " ++ show nextState ++ ",(nextState : state : states): " ++ show (nextState : state : states) ++ ", Values: " ++ show newValues) $
-                       parse' (nextState : state : states) tokens newValues
-                else if take 1 action == "r" then
-                    -- Reduce operation
-                    let (lhs, rhs) = parseProduction action
-                        valuesToReduce = take (length rhs) values
-                        remainingValues = drop (length rhs) values
-                        remainingStats = drop (length rhs) (state : states)
+    where
+        parse' :: [Int] -> [Token] -> [Value] -> Either String Value
+        parse' (state:states) (token:tokens) values =
+            case lookupAction (show state) (tableColNames token) (parsingTable parser) of
+                Just action ->
+                    -- Print the current state, token, and action
+                    trace ("State: " ++ show state ++ ", Token: " ++ show token ++ ", Action: " ++ action) $
+                    if take 1 action == "s" then
+                        -- Shift operation
+                        let nextState = read (drop 1 action) :: Int
+                            newValues = if mode == EVAL 
+                                then case token of
+                                    NUMBER n    -> ValDouble n : values
+                                    VAR 'X'     -> ValDouble (xValue parser) : values
+                                    FUNCTION f  -> ValString f : values
+                                    OP op       -> ValString [op] : values
+                                    _           -> error "Unexpected token type"
+                                else values
+                        in trace ("Shift to state: " ++ show nextState ++ ",(nextState : state : states): " ++ show (nextState : state : states) ++ ", Values: " ++ show newValues) $
+                            parse' (nextState : state : states) tokens newValues
+                    else if take 1 action == "r" then
+                        -- Reduce operation
+                        let (lhs, rhs) = parseProduction action
+                            valuesToReduce = take (length rhs) values
+                            remainingValues = drop (length rhs) values
+                            remainingStats = drop (length rhs) (state : states)
+                            result = if mode == EVAL
+                                then evaluate parser lhs (reverse valuesToReduce)
+                                else ValDouble(3)
+                            -- Look up the new state after the reduction
+                            newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
+                                Just nextAction -> read (nextAction) :: Int
+                                Nothing         -> error "Failed to find next state during reduction"
+                            newValues = result : remainingValues
+                            -- Add newState to states stack
+                            
+                            updatedStates = newState : remainingStats
+                        -- Print the reduction and new state
+                        in trace ("Reduce using " ++ action ++ ",valuesToReduce: " ++ show valuesToReduce ++ ",result: "++ show result ++ ", New state: " ++ show newState ++ ", updatedStates: " ++ show updatedStates ++ ", Values: " ++ show newValues) $
+                            parse' updatedStates (token:tokens) newValues
+                    else if action == "acc" then
+                        trace "Accept action reached, parsing complete." $
+                        if mode == EVAL 
+                            then Right (head values)  -- Final result
+                            else Left "Not implemented"
+                    else
+                        trace ("Unknown action: " ++ action) $
+                        Left "Unknown action"
+                Nothing -> trace "Parsing error: no action found." $
+                            Left "Parsing error"
+        parse' _ [] _ = trace "Incomplete input: no more tokens left." $
+                        Left "Incomplete input"
 
-                        result = evaluate parser lhs (reverse valuesToReduce)
-                        -- Look up the new state after the reduction
-                        newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
-                            Just nextAction -> read (nextAction) :: Int
-                            Nothing         -> error "Failed to find next state during reduction"
-                        newValues = result : remainingValues
-                        -- Add newState to states stack
-                        
-                        updatedStates = newState : remainingStats
-                    -- Print the reduction and new state
-                    in trace ("Reduce using " ++ action ++ ",valuesToReduce: " ++ show valuesToReduce ++ ",result: "++ show result ++ ", New state: " ++ show newState ++ ", updatedStates: " ++ show updatedStates ++ ", Values: " ++ show newValues) $
-                       parse' updatedStates (token:tokens) newValues
-                else if action == "acc" then
-                    trace "Accept action reached, parsing complete." $
-                    Right (head values)  -- Final result
-                else
-                    trace ("Unknown action: " ++ action) $
-                    Left "Unknown action"
-            Nothing -> trace "Parsing error: no action found." $
-                       Left "Parsing error"
-    parse' _ [] _ = trace "Incomplete input: no more tokens left." $
-                    Left "Incomplete input"
-
-    tableColNames :: Token -> String
-    tableColNames (NUMBER _) = "NUMBER"
-    tableColNames (VAR _) = "X"
-    tableColNames (FUNCTION func) = func
-    tableColNames (OP op) = [op]
-    tableColNames (EndOfInput _) = "$"
+        tableColNames :: Token -> String
+        tableColNames (NUMBER _) = "NUMBER"
+        tableColNames (VAR _) = "X"
+        tableColNames (FUNCTION func) = func
+        tableColNames (OP op) = [op]
+        tableColNames (EndOfInput _) = "$"
 
 
-    parseProduction :: String -> (String, [String])
-    parseProduction prod = 
-        let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
-            trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
-            trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
-        in (trimmedLhs, trimmedRhs)
+        parseProduction :: String -> (String, [String])
+        parseProduction prod = 
+            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
+                trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
+                trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
+            in (trimmedLhs, trimmedRhs)
 
--- Helper function to trim spaces
-trim :: String -> String
-trim = unwords . words
+        -- Helper function to trim spaces
+        trim :: String -> String
+        trim = unwords . words
 
 evaluate :: LRParser -> String -> [Value] -> Value
 evaluate _ "E" [v] = v
@@ -301,7 +306,7 @@ main = do
 
     print tokens
 
-    case parse parser tokens Eval of
+    case parse parser tokens EVAL of
         Right result -> putStrLn $ "Result: " ++ show result
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
 

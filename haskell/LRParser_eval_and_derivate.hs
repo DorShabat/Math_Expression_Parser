@@ -171,7 +171,7 @@ data LRParser = LRParser
     , xValue   :: Double  -- This represents the value of X
     }
 
-data Mode = Eval | Derivative
+data Mode = EVAL | DERIVATIVE deriving (Eq)
 
 data Value = ValString String
            | ValDouble Double
@@ -188,72 +188,86 @@ data Node = Node
 
 parse :: LRParser -> [Token] -> Mode -> Either String Value
 parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with state 0, empty value stack
-  where
-    parse' :: [Int] -> [Token] -> [Value] -> Either String Value
-    parse' (state:states) (token:tokens) values =
-        case lookupAction (show state) (tableColNames token) (parsingTable parser) of
-            Just action ->
-                -- Print the current state, token, and action
-                trace ("State: " ++ show state ++ ", Token: " ++ show token ++ ", Action: " ++ action) $
-                if take 1 action == "s" then
-                    -- Shift operation
-                    let nextState = read (drop 1 action) :: Int
-                        newValues = case token of
-                            NUMBER n    -> ValDouble n : values
-                            VAR 'X'     -> ValDouble (xValue parser) : values
-                            FUNCTION f  -> ValString f : values
-                            OP op       -> ValString [op] : values
-                            _           -> error "Unexpected token type"
-                    in trace ("Shift to state: " ++ show nextState ++ ",(nextState : state : states): " ++ show (nextState : state : states) ++ ", Values: " ++ show newValues) $
-                       parse' (nextState : state : states) tokens newValues
-                else if take 1 action == "r" then
-                    -- Reduce operation
-                    let (lhs, rhs) = parseProduction action
-                        valuesToReduce = take (length rhs) values
-                        remainingValues = drop (length rhs) values
-                        remainingStats = drop (length rhs) (state : states)
-
-                        result = evaluate parser lhs (reverse valuesToReduce)
-                        -- Look up the new state after the reduction
-                        newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
-                            Just nextAction -> read (nextAction) :: Int
-                            Nothing         -> error "Failed to find next state during reduction"
-                        newValues = result : remainingValues
-                        -- Add newState to states stack
-                        
-                        updatedStates = newState : remainingStats
-                    -- Print the reduction and new state
-                    in trace ("Reduce using " ++ action ++ ",valuesToReduce: " ++ show valuesToReduce ++ ",result: "++ show result ++ ", New state: " ++ show newState ++ ", updatedStates: " ++ show updatedStates ++ ", Values: " ++ show newValues) $
-                       parse' updatedStates (token:tokens) newValues
-                else if action == "acc" then
-                    trace "Accept action reached, parsing complete." $
-                    Right (head values)  -- Final result
-                else
-                    trace ("Unknown action: " ++ action) $
-                    Left "Unknown action"
-            Nothing -> trace "Parsing error: no action found." $
-                       Left "Parsing error"
-    parse' _ [] _ = trace "Incomplete input: no more tokens left." $
-                    Left "Incomplete input"
-
-    tableColNames :: Token -> String
-    tableColNames (NUMBER _) = "NUMBER"
-    tableColNames (VAR _) = "X"
-    tableColNames (FUNCTION func) = func
-    tableColNames (OP op) = [op]
-    tableColNames (EndOfInput _) = "$"
+    where
+        parse' :: [Int] -> [Token] -> [Value] -> Either String Value
+        parse' (state:states) (token:tokens) values =
+            case lookupAction (show state) (tableColNames token) (parsingTable parser) of
+                Just action ->
+                    -- Print the current state, token, and action
+                    trace ("State: " ++ show state ++ ", Token: " ++ show token ++ ", Action: " ++ action) $
+                    if take 1 action == "s" then
+                        -- Shift operation
+                        let nextState = read (drop 1 action) :: Int
+                            newValues = if mode == EVAL 
+                                then case token of
+                                    NUMBER n    -> ValDouble n : values
+                                    VAR 'X'     -> ValDouble (xValue parser) : values
+                                    FUNCTION f  -> ValString f : values
+                                    OP op       -> ValString [op] : values
+                                    _           -> error "Unexpected token type"
+                                else case token of -- DERIVATIVE mode
+                                    NUMBER n    -> ValNode (Node (show n) Nothing Nothing) : values
+                                    VAR 'X'     -> ValNode (Node "X" Nothing Nothing) : values
+                                    FUNCTION f  -> ValString f : values
+                                    OP op       -> ValString [op] : values
+                                    _           -> error "Unexpected token type"
+                        in trace ("Shift to state: " ++ show nextState ++ ",(nextState : state : states): " ++ show (nextState : state : states) ++ ", Values: " ++ show newValues) $
+                            parse' (nextState : state : states) tokens newValues
+                    else if take 1 action == "r" then
+                        -- Reduce operation
+                        let (lhs, rhs) = parseProduction action
+                            valuesToReduce = take (length rhs) values
+                            remainingValues = drop (length rhs) values
+                            remainingStats = drop (length rhs) (state : states)
+                            result = if mode == EVAL
+                                then evaluate parser lhs (reverse valuesToReduce)
+                                else build_tree parser lhs (reverse valuesToReduce) -- mode == DERIVATIVE
+                            -- Look up the new state after the reduction
+                            newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
+                                Just nextAction -> read (nextAction) :: Int
+                                Nothing         -> error "Failed to find next state during reduction"
+                            newValues = result : remainingValues
+                            -- Add newState to states stack
+                            
+                            updatedStates = newState : remainingStats
+                        -- Print the reduction and new state
+                        in trace ("Reduce using " ++ action ++ ",valuesToReduce: " ++ show valuesToReduce ++ ",result: "++ show result ++ ", New state: " ++ show newState ++ ", updatedStates: " ++ show updatedStates ++ ", Values: " ++ show newValues) $
+                            parse' updatedStates (token:tokens) newValues
+                    else if action == "acc" then
+                        trace "Accept action reached, parsing complete." $
+                        if mode == EVAL 
+                            then Right (head values)  -- Final result in EVAL mode
+                            else case head values of  -- Mode DERIVATIVE
+                                ValNode node -> Right (ValString (treeToString (differentiate node)))
+                                _ -> error "Expected a node in DERIVATIVE mode"
 
 
-    parseProduction :: String -> (String, [String])
-    parseProduction prod = 
-        let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
-            trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
-            trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
-        in (trimmedLhs, trimmedRhs)
+                    else
+                        trace ("Unknown action: " ++ action) $
+                        Left "Unknown action"
+                Nothing -> trace "Parsing error: no action found." $
+                            Left "Parsing error"
+        parse' _ [] _ = trace "Incomplete input: no more tokens left." $
+                        Left "Incomplete input"
 
--- Helper function to trim spaces
-trim :: String -> String
-trim = unwords . words
+        tableColNames :: Token -> String
+        tableColNames (NUMBER _) = "NUMBER"
+        tableColNames (VAR _) = "X"
+        tableColNames (FUNCTION func) = func
+        tableColNames (OP op) = [op]
+        tableColNames (EndOfInput _) = "$"
+
+
+        parseProduction :: String -> (String, [String])
+        parseProduction prod = 
+            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
+                trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
+                trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
+            in (trimmedLhs, trimmedRhs)
+
+        -- Helper function to trim spaces
+        trim :: String -> String
+        trim = unwords . words
 
 evaluate :: LRParser -> String -> [Value] -> Value
 evaluate _ "E" [v] = v
@@ -277,6 +291,98 @@ evaluate _ _ (v:_) = v
 evaluate _ _ _ = error "Unknown evaluation"
 
 
+build_tree :: LRParser -> String -> [Value] -> Value
+build_tree _ "E" [v] = v
+build_tree _ "E" [ValNode n1, ValString "+", ValNode n2] = ValNode (Node "+" (Just n1) (Just n2))
+build_tree _ "E" [ValNode n1, ValString "-", ValNode n2] = ValNode (Node "-" (Just n1) (Just n2))
+
+build_tree _ "T" [v] = v
+build_tree _ "T" [ValNode n1, ValString "*", ValNode n2] = ValNode (Node "*" (Just n1) (Just n2))
+build_tree _ "T" [ValNode n1, ValString "/", ValNode n2] = ValNode (Node "/" (Just n1) (Just n2))
+
+build_tree _ "F" [v] = v
+build_tree _ "F" [ValNode n1, ValString "^", ValNode n2] = ValNode (Node "^" (Just n1) (Just n2))
+
+build_tree _ "G" [v] = v
+build_tree _ "G" [ValString "-", ValNode n] = ValNode (Node "-" Nothing (Just n))
+build_tree _ "G" [ValString "(", v, ValString ")"] = v
+build_tree _ "G" [ValString func, ValString "(", ValNode arg, ValString ")"] = ValNode (Node func Nothing (Just arg))
+
+build_tree _ _ (v:_) = v
+build_tree _ _ _ = error "Unknown tree construction"
+
+
+differentiate :: Node -> Node
+differentiate (Node "X" _ _) = Node "1" Nothing Nothing  -- Derivative of X is 1
+differentiate (Node val _ _) 
+    | isNumeric val = Node "0" Nothing Nothing  -- Derivative of a constant is 0
+differentiate (Node "+" (Just l) (Just r)) = Node "+" (Just (differentiate l)) (Just (differentiate r))
+differentiate (Node "-" Nothing (Just r)) = Node "-" Nothing (Just (differentiate r))
+differentiate (Node "-" (Just l) (Just r)) = Node "-" (Just (differentiate l)) (Just (differentiate r))
+differentiate (Node "*" (Just l) (Just r)) =
+    Node "+" (Just (Node "*" (Just (differentiate l)) (Just r)))
+             (Just (Node "*" (Just l) (Just (differentiate r))))
+differentiate (Node "/" (Just l) (Just r)) =
+    Node "/" (Just (Node "-" (Just (Node "*" (Just (differentiate l)) (Just r)))
+                           (Just (Node "*" (Just l) (Just (differentiate r))))))
+             (Just (Node "^" (Just r) (Just (Node "2" Nothing Nothing))))
+differentiate (Node "^" (Just base) (Just exponent)) =
+    Node "*" (Just (Node "^" (Just base) (Just exponent)))
+             (Just (Node "+"
+                   (Just (Node "*" (Just exponent)
+                                  (Just (Node "/" (Just (differentiate base)) (Just base)))))
+                   (Just (Node "*" (Just (Node "ln" Nothing (Just base)))
+                                  (Just (differentiate exponent))))))
+differentiate (Node "sin" Nothing (Just arg)) =
+    Node "*" (Just (Node "cos" Nothing (Just arg))) (Just (differentiate arg))
+differentiate (Node "cos" Nothing (Just arg)) =
+    Node "*" (Just (Node "*" (Just (Node "-1" Nothing Nothing)) (Just (Node "sin" Nothing (Just arg))))) (Just (differentiate arg))
+differentiate (Node "tg" Nothing (Just arg)) =
+    Node "*" (Just (Node "/" (Just (Node "1" Nothing Nothing)) (Just (Node "^" (Just (Node "cos" Nothing (Just arg))) (Just (Node "2" Nothing Nothing)))))) (Just (differentiate arg))
+differentiate (Node "arcsin" Nothing (Just arg)) =
+    Node "*" 
+        (Just (Node "/" (Just (Node "1" Nothing Nothing))
+                            (Just (Node "^" (Just (Node "-" (Just (Node "1" Nothing Nothing)) (Just (Node "^" (Just arg) (Just (Node "2" Nothing Nothing)))))) (Just (Node "0.5" Nothing Nothing)))))) (Just (differentiate arg))
+differentiate (Node "arccos" Nothing (Just right)) =
+    Node "*" 
+        (Just (Node "-1" Nothing Nothing)) 
+        (Just (Node "*" 
+                (Just (Node "/" 
+                        (Just (Node "1" Nothing Nothing)) 
+                        (Just (Node "^" 
+                                (Just (Node "-" 
+                                        (Just (Node "1" Nothing Nothing)) 
+                                        (Just (Node "^" (Just right) (Just (Node "2" Nothing Nothing))))))
+                                (Just (Node "0.5" Nothing Nothing))))))
+                (Just (differentiate right))))
+
+differentiate (Node "arctg" Nothing (Just right)) =
+    Node "*" 
+        (Just (Node "/" 
+                (Just (Node "1" Nothing Nothing)) 
+                (Just (Node "+" 
+                        (Just (Node "1" Nothing Nothing)) 
+                        (Just (Node "^" (Just right) (Just (Node "2" Nothing Nothing))))))))
+        (Just (differentiate right))
+differentiate (Node "exp" Nothing (Just arg)) =
+    Node "*" (Just (Node "exp" Nothing (Just arg))) (Just (differentiate arg))
+differentiate (Node "ln" Nothing (Just arg)) =
+    Node "*" (Just (Node "/" (Just (Node "1" Nothing Nothing)) (Just arg))) (Just (differentiate arg))
+differentiate node = error $ "Unsupported operation: " ++ value node
+
+-- Helper function to check if a string is numeric
+isNumeric :: String -> Bool
+isNumeric = all (`elem` "0123456789.")
+
+-- Function to convert a Node tree to a string
+treeToString :: Node -> String
+treeToString (Node val Nothing Nothing) = val
+treeToString (Node val left right) =
+    let leftStr  = maybe "" treeToString left
+        rightStr = maybe "" treeToString right
+    in if val `elem` ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp", "-"]
+       then leftStr ++ " " ++ val ++ " (" ++ rightStr ++ ")"
+       else "(" ++ leftStr ++ " " ++ val ++ " " ++ rightStr ++ ")"
 
 
 applyFunction :: String -> Double -> Double
@@ -295,13 +401,27 @@ applyFunction funcName _ = error $ "Unknown function: " ++ funcName
 main :: IO ()
 main = do
     let parser = LRParser getParsingTable3 2.0  -- Let's assume X = 2.0 for this example
-    --"X^2 + sin(X) - 3.14"
-    --let tokens = tokenize "4*2 + 2^3 + 6/2 + sin(X)"
     let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654"
-
-    print tokens
-
-    case parse parser tokens Eval of
-        Right result -> putStrLn $ "Result: " ++ show result
+    --let tokens = tokenize "X^7+(X+11*2*X/4)+sin(X*2)"
+    --print tokens
+    -- arcsin' -> 
+    --((1 / (1 - (((2 * X) ^ 2)) ^ 0.5)) * ((0 * X) + (2 * 1))) -- python
+    --((1 / ((1 - ((2.0 * X) ^ 2)) ^ 0.5)) * ((0 * X) + (2.0 * 1))) -- haskell
+    -- First, evaluate in EVAL mode
+    case parse parser tokens EVAL of
+        Right result -> putStrLn $ "EVAL: " ++ show result
         Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
+    
+    -- Then, evaluate in DERIVATIVE mode
+    case parse parser tokens DERIVATIVE of
+        Right (ValString resultDERIVATIVE) -> do
+            putStrLn $ "DERIVATIVE: " ++ resultDERIVATIVE
+            -- Now parse the derivative result in EVAL mode
+            let derivativeTokens = tokenize resultDERIVATIVE
+            case parse parser derivativeTokens EVAL of
+                Right evalDERIVATIVE -> putStrLn $ "evalDERIVATIVE: " ++ show evalDERIVATIVE
+                Left errorMsg -> putStrLn $ "Error during evaluation of derivative: " ++ errorMsg
+        Right _ -> putStrLn "DERIVATIVE did not produce a string."
+        Left errorMsg -> putStrLn $ "Error: " ++ errorMsg
+
 
