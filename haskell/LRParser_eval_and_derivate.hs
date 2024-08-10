@@ -1,23 +1,28 @@
 import qualified Data.Map as Map
 import Data.Time.Clock
 
--- tokenizer
+-- Tokenizer
+-- Define the token types
 data Token = NUMBER Double
            | VAR Char
            | FUNCTION String
            | OP Char
            | EndOfInput Char
            deriving (Show, Eq)
-    
+
+-- Helper function to check if a character is a digit
 isDigit :: Char -> Bool
 isDigit c = c >= '0' && c <= '9'
 
+-- Helper function to check if a character is an alphabet
 isAlpha :: Char -> Bool
 isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 
+-- Helper function to check if a character is an operator
 isOperator :: Char -> Bool
 isOperator c = c `elem` "+-*/^()"
 
+-- Tokenize the input string
 tokenize :: String -> [Token]
 tokenize [] = [EndOfInput '$']
 tokenize (c:cs)
@@ -34,13 +39,13 @@ tokenize (c:cs)
 ----------------------------------------------------------------------------
 
 -- parsing table
-
+-- Define the types
 type State = String
 type Symbol = String
 type Action = String
-
 type ParsingTable = Map.Map State (Map.Map Symbol Action)
 
+-- Define the parsing table
 getParsingTable :: ParsingTable
 getParsingTable = Map.fromList
     [ ("0",  Map.fromList 
@@ -150,14 +155,15 @@ getParsingTable = Map.fromList
           ("$", "r( G -> Func ( E ) )") ])
     ]
 
-
+-- Helper function to look up: ParsingTable[State][Symbol]
+-- State can be 0 - 33
+-- Symbol can be: (, ), *, +, -, /, NUMBER, X, ^, arccos, arcsin, arctg, cos, exp, ln, sin, tg, $, E, T, F, G, Func
+-- when action table is: (, ), *, +, -, /, NUMBER, X, ^, arccos, arcsin, arctg, cos, exp, ln, sin, tg, $ and the goto table is: E, T, F, G, Func
 lookupAction :: State -> Symbol -> ParsingTable -> Maybe Action
 lookupAction state symbol table = 
     case Map.lookup state table of
         Just actions -> Map.lookup symbol actions
         Nothing -> Nothing
-
-
 ---------------------------------------------------------------------------
 
 data LRParser = LRParser
@@ -165,13 +171,16 @@ data LRParser = LRParser
     , xValue   :: Double  -- This represents the value of X
     }
 
+-- Define Mode type: EVAL for evaluating the expression, DERIVATIVE for differentiating the expression
 data Mode = EVAL | DERIVATIVE deriving (Eq)
 
+-- Define the Value type to store the result of the parsing
 data Value = ValString String
            | ValDouble Double
            | ValNode Node
            deriving (Show, Eq)
 
+-- Define the Node type to store the operator tree
 data Node = Node
     { value    :: String
     , left     :: Maybe Node
@@ -179,9 +188,9 @@ data Node = Node
     }
     deriving (Show, Eq)
 
-
+-- Function to parse the input tokens using the LR parser
 parse :: LRParser -> [Token] -> Mode -> Either String Value
-parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with state 0, empty value stack
+parse parser tokens mode = parse' [0] tokens []
     where
         parse' :: [Int] -> [Token] -> [Value] -> Either String Value
         parse' (state:states) (token:tokens) values =
@@ -190,14 +199,14 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                     if take 1 action == "s" then
                         -- Shift operation
                         let nextState = read (drop 1 action) :: Int
-                            newValues = if mode == EVAL 
+                            newValues = if mode == EVAL  -- EVAL mode
                                 then case token of
                                     NUMBER n    -> ValDouble n : values
                                     VAR 'X'     -> ValDouble (xValue parser) : values
                                     FUNCTION f  -> ValString f : values
                                     OP op       -> ValString [op] : values
                                     _           -> error "Unexpected token type"
-                                else case token of -- DERIVATIVE mode
+                                else case token of      -- DERIVATIVE mode
                                     NUMBER n    -> ValNode (Node (show n) Nothing Nothing) : values
                                     VAR 'X'     -> ValNode (Node "X" Nothing Nothing) : values
                                     FUNCTION f  -> ValString f : values
@@ -211,8 +220,8 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                             remainingValues = drop (length rhs) values
                             remainingStats = drop (length rhs) (state : states)
                             result = if mode == EVAL
-                                then evaluate parser lhs (reverse valuesToReduce)
-                                else build_tree parser lhs (reverse valuesToReduce) -- mode == DERIVATIVE
+                                then evaluate parser lhs (reverse valuesToReduce)   -- EVAL mode
+                                else build_tree parser lhs (reverse valuesToReduce) -- DERIVATIVE mode
                             -- Look up the new state after the reduction
                             newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
                                 Just nextAction -> read (nextAction) :: Int
@@ -223,8 +232,8 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                         in parse' updatedStates (token:tokens) newValues
                     else if action == "acc" then
                         if mode == EVAL 
-                            then Right (head values)  -- Final result in EVAL mode
-                            else case head values of  -- Mode DERIVATIVE
+                            then Right (head values)  -- EVAL mode
+                            else case head values of  -- DERIVATIVE mode
                                 ValNode node -> Right (ValString (treeToString (differentiate node)))
                                 _ -> error "Expected a node in DERIVATIVE mode"
                     else
@@ -232,7 +241,7 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
                 Nothing -> Left "Parsing error"          
         parse' _ [] _ = Left "Incomplete input"
                         
-
+        -- Helper function to get the column name for a token
         tableColNames :: Token -> String
         tableColNames (NUMBER _) = "NUMBER"
         tableColNames (VAR _) = "X"
@@ -240,7 +249,7 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
         tableColNames (OP op) = [op]
         tableColNames (EndOfInput _) = "$"
 
-
+        -- Helper function to parse a production rule
         parseProduction :: String -> (String, [String])
         parseProduction prod = 
             let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
@@ -252,6 +261,7 @@ parse parser tokens mode = parse' [0] tokens [] -- Initial state stack with stat
         trim :: String -> String
         trim = unwords . words
 
+-- Function to evaluate the parsed expression
 evaluate :: LRParser -> String -> [Value] -> Value
 evaluate _ "E" [v] = v
 evaluate _ "E" [ValDouble v1, ValString "+", ValDouble v2] = ValDouble (v1 + v2)
@@ -273,7 +283,7 @@ evaluate _ "G" [ValString func, ValString "(", ValDouble arg, ValString ")"] = V
 evaluate _ _ (v:_) = v
 evaluate _ _ _ = error "Unknown evaluation"
 
-
+-- Helper function to apply a function to an argument
 applyFunction :: String -> Double -> Double
 applyFunction "sin" arg = sin(arg)
 applyFunction "cos" arg = cos(arg)
@@ -285,7 +295,7 @@ applyFunction "arccos" arg = acos(arg)
 applyFunction "arctg"  arg = atan(arg)
 applyFunction funcName _ = error $ "Unknown function: " ++ funcName
 
-
+-- Function to build a operator tree from the parsed expression
 build_tree :: LRParser -> String -> [Value] -> Value
 build_tree _ "E" [v] = v
 build_tree _ "E" [ValNode n1, ValString "+", ValNode n2] = ValNode (Node "+" (Just n1) (Just n2))
@@ -306,7 +316,7 @@ build_tree _ "G" [ValString func, ValString "(", ValNode arg, ValString ")"] = V
 build_tree _ _ (v:_) = v
 build_tree _ _ _ = error "Unknown tree construction"
 
-
+-- Function to differentiate the operator tree, returning a new derived tree
 differentiate :: Node -> Node
 differentiate (Node "X" _ _) = Node "1" Nothing Nothing  -- Derivative of X is 1
 differentiate (Node val _ _) 
@@ -380,11 +390,6 @@ treeToString (Node val left right) =
        else "(" ++ leftStr ++ " " ++ val ++ " " ++ rightStr ++ ")"
 
 
-
-
-
--- More functions as needed
-
 main :: IO ()
 main = do
     tt_start_tokenize <- getCurrentTime
@@ -394,8 +399,8 @@ main = do
     putStrLn ("f(X) = " ++ expression)
     putStrLn ("len of expression f(X): " ++ show (length expression))
 
-    let parser = LRParser getParsingTable x_value  -- Assuming X = 2.0 for this example
-    let tokens = tokenize expression
+    let parser = LRParser getParsingTable x_value 
+    let tokens = tokenize expression  -- Tokenize the expression
     
     tt_end_tokenize <- getCurrentTime
     let lrParserTokenizeRunTime = diffUTCTime tt_end_tokenize tt_start_tokenize
@@ -403,7 +408,7 @@ main = do
 
     -- Evaluate f(X) , X = x_value
     tt_start_eval <- getCurrentTime
-    case parse parser tokens EVAL of
+    case parse parser tokens EVAL of -- Evaluate the expression
         Right (ValDouble result) -> do
             tt_end_eval <- getCurrentTime
             let evalRunTime = diffUTCTime tt_end_eval tt_start_eval
@@ -415,9 +420,9 @@ main = do
             putStrLn $ "Error: " ++ errorMsg
             putStrLn $ "Evaluation time: " ++ show evalRunTime
 
-    -- Then, evaluate in DERIVATIVE mode
+    -- Differentiate f(X) and evaluate the derivative at X = x_value
     tt_start_derivative <- getCurrentTime
-    case parse parser tokens DERIVATIVE of
+    case parse parser tokens DERIVATIVE of -- Differentiate the expression
         Right (ValString derivative) -> do
             tt_end_derivative <- getCurrentTime
             let derivativeRunTime = diffUTCTime tt_end_derivative tt_start_derivative
@@ -425,7 +430,7 @@ main = do
             putStrLn $ "Differentiate time: " ++ show derivativeRunTime
             -- Now parse the derivative result in EVAL mode
             let derivativeTokens = tokenize derivative
-            case parse parser derivativeTokens EVAL of
+            case parse parser derivativeTokens EVAL of -- Evaluate the derivative at X = x_value
                 Right (ValDouble evalDerivative) -> putStrLn $ "\nDiff(f(" ++ show x_value ++ ")) = " ++ show evalDerivative
                 Left errorMsg -> putStrLn $ "Error during evaluation of derivative: " ++ errorMsg
         Right _ -> putStrLn "DERIVATIVE did not produce a string."
