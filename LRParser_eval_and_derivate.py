@@ -326,6 +326,7 @@ def main():
     value at x = 1: -10968.1737085657 + 38116.0419579044*I
     '''
     expressions = [
+        "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)+arctg(X/7)*(11-2*(X^3))-63*exp(X)/9+tg(18^(4*X))-(cos(X-6)/5*X)+X^X-X^X^X+X^2^X-X^X^X^X-2*X*17*sin(8*X-13)+87654",
         "3+4",
         "X^3 + sin(X) - 3.14",
         "X^7+(X+11*2*X/4)+sin(X*2)+cos(sin(X))-(ln(81*X))*exp(2)",  # 103.265
