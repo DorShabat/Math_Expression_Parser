@@ -14,6 +14,10 @@ data Token = NUMBER Double
 isDigit :: Char -> Bool
 isDigit c = c >= '0' && c <= '9'
 
+-- Helper function to check if a character is a digit or a dot
+isDigitOrDot :: Char -> Bool
+isDigitOrDot x = isDigit x || x == '.'
+
 -- Helper function to check if a character is an alphabet
 isAlpha :: Char -> Bool
 isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -22,11 +26,13 @@ isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 isOperator :: Char -> Bool
 isOperator c = c `elem` "+-*/^()"
 
+
 -- Tokenize the input string
+-- span :: (a -> Bool) -> [a] -> ([a], [a]), span p xs returns the longest prefix of xs of elements that satisfy p
 tokenize :: String -> [Token]
 tokenize [] = [EndOfInput '$']
 tokenize (c:cs)
-    | isDigit c  = let (number, rest) = span (\x -> isDigit x || x == '.') (c:cs)
+    | isDigit c  = let (number, rest) = span isDigitOrDot (c:cs) 
                    in NUMBER (read number) : tokenize rest
     | isAlpha c  = let (func, rest) = span isAlpha (c:cs)
                    in case func of
@@ -43,7 +49,7 @@ tokenize (c:cs)
 type State = String
 type Symbol = String
 type Action = String
-type ParsingTable = Map.Map State (Map.Map Symbol Action)
+type ParsingTable = Map.Map State (Map.Map Symbol Action) -- defines ParsingTable as a nested map structure
 
 -- Define the parsing table
 getParsingTable :: ParsingTable
@@ -160,15 +166,15 @@ getParsingTable = Map.fromList
 -- Symbol can be: (, ), *, +, -, /, NUMBER, X, ^, arccos, arcsin, arctg, cos, exp, ln, sin, tg, $, E, T, F, G, Func
 -- when action table is: (, ), *, +, -, /, NUMBER, X, ^, arccos, arcsin, arctg, cos, exp, ln, sin, tg, $ and the goto table is: E, T, F, G, Func
 lookupAction :: State -> Symbol -> ParsingTable -> Maybe Action
-lookupAction state symbol table = 
-    case Map.lookup state table of
-        Just actions -> Map.lookup symbol actions
+lookupAction state symbol table =  -- search the state in the parsing table -> if found (stateRow), search the symbol(colName) in the stateRow
+    case Map.lookup state table of 
+        Just stateRow -> Map.lookup symbol stateRow
         Nothing -> Nothing
 ---------------------------------------------------------------------------
 
 data LRParser = LRParser
     { parsingTable :: ParsingTable
-    , xValue   :: Double  -- This represents the value of X
+    , xValue   :: Double  -- Value of X
     }
 
 -- Define Mode type: EVAL for evaluating the expression, DERIVATIVE for differentiating the expression
@@ -198,7 +204,7 @@ parse parser tokens mode = parse' [0] tokens []
                 Just action ->
                     if take 1 action == "s" then
                         -- Shift operation
-                        let nextState = read (drop 1 action) :: Int
+                        let nextState = read (drop 1 action) :: Int -- sNUM -> NUM . 
                             newValues = if mode == EVAL  -- EVAL mode
                                 then case token of
                                     NUMBER n    -> ValDouble n : values
@@ -223,7 +229,7 @@ parse parser tokens mode = parse' [0] tokens []
                                 then evaluate parser lhs (reverse valuesToReduce)   -- EVAL mode
                                 else build_tree parser lhs (reverse valuesToReduce) -- DERIVATIVE mode
                             -- Look up the new state after the reduction
-                            newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of
+                            newState = case lookupAction (show (head remainingStats)) lhs (parsingTable parser) of -- "from go to table"
                                 Just nextAction -> read (nextAction) :: Int
                                 Nothing         -> error "Failed to find next state during reduction"
                             newValues = result : remainingValues
@@ -249,17 +255,17 @@ parse parser tokens mode = parse' [0] tokens []
         tableColNames (OP op) = [op]
         tableColNames (EndOfInput _) = "$"
 
-        -- Helper function to parse a production rule
+        -- Helper function to parse a production rule, 
         parseProduction :: String -> (String, [String])
         parseProduction prod = 
-            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- "r( E -> T )" -> ("E", ["T"])
+            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- init prod removes the last ')' , drop 2 removes the 'r('. :: "r( E -> T )" -> ("E", ["T"])
                 trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
                 trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
             in (trimmedLhs, trimmedRhs)
 
         -- Helper function to trim spaces
         trim :: String -> String
-        trim = unwords . words
+        trim = unwords . words -- words splits the string into words (removing any extra spaces), unwords joins the words back into a string
 
 -- Function to evaluate the parsed expression
 evaluate :: LRParser -> String -> [Value] -> Value
