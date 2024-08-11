@@ -161,6 +161,8 @@ getParsingTable = Map.fromList
           ("$", "r( G -> Func ( E ) )") ])
     ]
 
+
+
 -- Helper function to look up: ParsingTable[State][Symbol]
 -- State can be 0 - 33
 -- Symbol can be: (, ), *, +, -, /, NUMBER, X, ^, arccos, arcsin, arctg, cos, exp, ln, sin, tg, $, E, T, F, G, Func
@@ -255,17 +257,17 @@ parse parser tokens mode = parse' [0] tokens []
         tableColNames (OP op) = [op]
         tableColNames (EndOfInput _) = "$"
 
-        -- Helper function to parse a production rule, 
+        -- Helper function to parse a production rule, for example "r( E -> T )" -> ("E", ["T"])
         parseProduction :: String -> (String, [String])
         parseProduction prod = 
-            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- init prod removes the last ')' , drop 2 removes the 'r('. :: "r( E -> T )" -> ("E", ["T"])
+            let (lhs, rhs) = break (== '-') (drop 2 (init prod)) -- init prod removes the last ')' , drop 2 removes the 'r('. 
                 trimmedLhs = trim lhs   -- Remove leading/trailing spaces from lhs
                 trimmedRhs = words (drop 2 rhs) -- `words` already handles trimming spaces between symbols in rhs
             in (trimmedLhs, trimmedRhs)
 
         -- Helper function to trim spaces
         trim :: String -> String
-        trim = unwords . words -- words splits the string into words (removing any extra spaces), unwords joins the words back into a string
+        trim str = unwords (words str)-- words splits the string into words (removing any extra spaces), unwords joins the words back into a string
 
 -- Function to evaluate the parsed expression
 evaluate :: LRParser -> String -> [Value] -> Value
