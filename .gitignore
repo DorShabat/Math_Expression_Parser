@@ -7,3 +7,6 @@ haskell/tempCodeRunnerFile.hi
 haskell/tempCodeRunnerFile.o
 haskell/tempCodeRunnerFile.exe
 haskell/LRParser_eval_and_derivate.o
+*.exe
+*.hi
+*.o

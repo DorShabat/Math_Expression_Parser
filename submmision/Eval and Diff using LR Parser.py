@@ -1,5 +1,4 @@
 import numpy as np
-from lr_parsing_table import get_parsing_table
 
 EVAL = 'eval'
 DERIVATIVE = 'derivative'
@@ -263,6 +262,63 @@ class Node:
         if self.value in ["cos", "sin", "ln", "tg", "arcsin", "arccos", "arctg", "exp"]:
             return f"{left_str} {self.value} ({right_str})"
         return f"({left_str} {self.value} {right_str})"
+
+
+def get_parsing_table():
+    parsing_table = {
+        '0': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 1, 'T': 2, 'F': 3, 'G': 4,
+              'Func': 7}, '1': {'+': 's18', '-': 's19', '$': 'acc'},
+        '2': {')': 'r( E -> T )', '*': 's20', '+': 'r( E -> T )', '-': 'r( E -> T )', '/': 's21', '$': 'r( E -> T )'},
+        '3': {')': 'r( T -> F )', '*': 'r( T -> F )', '+': 'r( T -> F )', '-': 'r( T -> F )', '/': 'r( T -> F )',
+              '$': 'r( T -> F )'},
+        '4': {')': 'r( F -> G )', '*': 'r( F -> G )', '+': 'r( F -> G )', '-': 'r( F -> G )', '/': 'r( F -> G )',
+              '^': 's22', '$': 'r( F -> G )'},
+        '5': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 23, 'T': 2, 'F': 3, 'G': 4,
+              'Func': 7},
+        '6': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+              'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'G': 24, 'Func': 7},
+        '7': {'(': 's25'},
+        '8': {')': 'r( G -> NUMBER )', '*': 'r( G -> NUMBER )', '+': 'r( G -> NUMBER )', '-': 'r( G -> NUMBER )',
+              '/': 'r( G -> NUMBER )', '^': 'r( G -> NUMBER )', '$': 'r( G -> NUMBER )'},
+        '9': {')': 'r( G -> X )', '*': 'r( G -> X )', '+': 'r( G -> X )', '-': 'r( G -> X )', '/': 'r( G -> X )',
+              '^': 'r( G -> X )', '$': 'r( G -> X )'}, '10': {'(': 'r( Func -> sin )'}, '11': {'(': 'r( Func -> cos )'},
+        '12': {'(': 'r( Func -> tg )'}, '13': {'(': 'r( Func -> arcsin )'}, '14': {'(': 'r( Func -> arccos )'},
+        '15': {'(': 'r( Func -> arctg )'}, '16': {'(': 'r( Func -> exp )'}, '17': {'(': 'r( Func -> ln )'},
+        '18': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'T': 26, 'F': 3, 'G': 4, 'Func': 7},
+        '19': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'T': 27, 'F': 3, 'G': 4, 'Func': 7},
+        '20': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 28, 'G': 4, 'Func': 7},
+        '21': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 29, 'G': 4, 'Func': 7},
+        '22': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'F': 30, 'G': 4, 'Func': 7},
+        '23': {')': 's31', '+': 's18', '-': 's19'},
+        '24': {')': 'r( G -> - G )', '*': 'r( G -> - G )', '+': 'r( G -> - G )', '-': 'r( G -> - G )',
+               '/': 'r( G -> - G )', '^': 'r( G -> - G )', '$': 'r( G -> - G )'},
+        '25': {'(': 's5', '-': 's6', 'NUMBER': 's8', 'X': 's9', 'arccos': 's14', 'arcsin': 's13', 'arctg': 's15',
+               'cos': 's11', 'exp': 's16', 'ln': 's17', 'sin': 's10', 'tg': 's12', 'E': 32, 'T': 2, 'F': 3, 'G': 4,
+               'Func': 7},
+        '26': {')': 'r( E -> E + T )', '*': 's20', '+': 'r( E -> E + T )', '-': 'r( E -> E + T )', '/': 's21',
+               '$': 'r( E -> E + T )'},
+        '27': {')': 'r( E -> E - T )', '*': 's20', '+': 'r( E -> E - T )', '-': 'r( E -> E - T )', '/': 's21',
+               '$': 'r( E -> E - T )'},
+        '28': {')': 'r( T -> T * F )', '*': 'r( T -> T * F )', '+': 'r( T -> T * F )', '-': 'r( T -> T * F )',
+               '/': 'r( T -> T * F )', '$': 'r( T -> T * F )'},
+        '29': {')': 'r( T -> T / F )', '*': 'r( T -> T / F )', '+': 'r( T -> T / F )', '-': 'r( T -> T / F )',
+               '/': 'r( T -> T / F )', '$': 'r( T -> T / F )'},
+        '30': {')': 'r( F -> G ^ F )', '*': 'r( F -> G ^ F )', '+': 'r( F -> G ^ F )', '-': 'r( F -> G ^ F )',
+               '/': 'r( F -> G ^ F )', '$': 'r( F -> G ^ F )'},
+        '31': {')': 'r( G -> ( E ) )', '*': 'r( G -> ( E ) )', '+': 'r( G -> ( E ) )', '-': 'r( G -> ( E ) )',
+               '/': 'r( G -> ( E ) )', '^': 'r( G -> ( E ) )', '$': 'r( G -> ( E ) )'},
+        '32': {')': 's33', '+': 's18', '-': 's19'},
+        '33': {')': 'r( G -> Func ( E ) )', '*': 'r( G -> Func ( E ) )', '+': 'r( G -> Func ( E ) )',
+               '-': 'r( G -> Func ( E ) )', '/': 'r( G -> Func ( E ) )', '^': 'r( G -> Func ( E ) )',
+               '$': 'r( G -> Func ( E ) )'}}
+    return parsing_table
 
 
 def evaluate_expression_traditionally(expression, x_value): # for texting functionality
