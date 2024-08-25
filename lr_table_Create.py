@@ -27,6 +27,5 @@ parsing_table = convert_lr_table_to_dict(lr_table_df)
 
 # Display the resulting parsing table dictionary
 print(parsing_table)
-print("newwww")
 for state, actions in parsing_table.items():
     print(f"'{state}': {actions},")
