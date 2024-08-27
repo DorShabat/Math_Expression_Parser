@@ -54,12 +54,8 @@ This grammar allows the parser to recognize and process a wide variety of mathem
 
 2. **Tree Visualization:**
    - The `tree_vizualize_functions.py` file contains functions to convert the operation tree into a `.png` file using Graphviz.
+   - you will need to add them in order to work.
 
-3. **Running the Program:**
-   - Run the main Python script using:
-     ```
-     python3 Eval\ and\ Diff\ using\ LR\ Parser.py
-     ```
 
 ### Haskell
 
